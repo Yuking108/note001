@@ -1,7 +1,7 @@
 /**
  * ページの器を作る。使い方:
  *   npm run new -- --title "ベベル後の編集が大変な問題" --main "Blender/モデリング"
- *   npm run new -- -t "…" -m "Blender/モデリング" -s 形式/Q&A -s 状態/検証中
+ *   npm run new -- -t "…" -m "Blender/モデリング" -s Blender/モデリング/ベベル -s Blender/レンダリング
  *
  * slug は日付 + 短い ID（例 20260920-a3f2）。
  * タイトルを後から変えても URL が壊れないように、slug にタイトルを含めない。
@@ -17,7 +17,7 @@ import { resolveLabel, resolveMainLabel, resolveRegistry } from '../src/lib/labe
 import { SCHEMA_VERSION, type LabelRegistry, type PageMeta } from '../src/lib/types';
 
 const USAGE =
-  '使い方: npm run new -- --title "ページのタイトル" --main "Blender/モデリング" [--sub 形式/Q&A ...]';
+  '使い方: npm run new -- --title "ページのタイトル" --main "Blender/モデリング" [--sub Blender/モデリング/ベベル ...]';
 
 function parseArgs(argv: string[]): { title: string; main: string; subs: string[] } {
   let title = '';

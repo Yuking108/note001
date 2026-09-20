@@ -234,8 +234,8 @@ export function resolveRegistry(registry: LabelRegistry): ResolvedRegistry {
   }
 
   // メインラベルの固定リストを組む。
-  // 「アプリ」は kind: 'app' を明示した第一階層だけ。形式・横断・状態はここに入らないので、
-  // `形式/Q&A` のような補助軸のラベルがメインラベルとして通ることはない。
+  // 「アプリ」は kind: 'app' を明示した第一階層だけ。kind: 'axis' の補助軸はここに入らないので、
+  // アプリ以外の第一階層を足しても、その配下がメインラベルとして通ることはない。
   const apps = paths.filter((path) => kinds.get(path) === 'app');
   const appKeys = new Map(apps.map((app) => [labelKey(app), app] as const));
   const sectionsOf = new Map<string, string[]>(apps.map((app) => [app, []]));
@@ -452,7 +452,7 @@ export function filterPages(
   );
 }
 
-/** URL のクエリ（`技術/SQLite,形式/調べ物`）とラベル配列の相互変換 */
+/** URL のクエリ（`Blender/モデリング,Blender/モデリング/ベベル`）とラベル配列の相互変換 */
 export function encodeLabelQuery(labels: string[]): string {
   return labels.join(',');
 }

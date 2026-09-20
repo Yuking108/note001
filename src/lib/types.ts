@@ -25,7 +25,7 @@ export type PageMeta = {
    * 配列ではなく文字列にして「1つしか付かない」を型で保証する。
    */
   mainLabel: string;
-  /** サブラベル。0件以上、複数可。メイン体系の3段目・他軸・横断ラベルなど */
+  /** サブラベル。0件以上、複数可。メイン体系の3段目や、もう一方のアプリ／別セクションなど */
   subLabels: string[];
   /** YYYY-MM-DD */
   createdAt: string;
@@ -51,7 +51,7 @@ export type LabelRegistry = {
 /**
  * 第一階層の種別。
  * - `app`  … 対象アプリ。**メインラベルの第一階層になれるのはこれだけ**
- * - `axis` … 形式・横断・状態などの補助軸。サブラベル専用
+ * - `axis` … アプリ以外の補助軸。サブラベル専用（現在は登録なし。label-spec.md §6 で廃止）
  * 第二階層以下では指定しない。
  */
 export type LabelKind = 'app' | 'axis';
