@@ -17,9 +17,14 @@ const MAX_HEIGHT = 40000;
  * allow-same-origin が無いためオリジンは opaque になる。
  * 高さ通知の検証は origin ではなく event.source で行う。
  */
+/** 本文が読み込めていないと判断するまでの待ち時間 */
+const LOAD_TIMEOUT_MS = 5000;
+
 export function PageFrame({ src, title }: { src: string; title: string }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
+  const answered = useRef(false);
+  const [unreachable, setUnreachable] = useState(false);
 
   /**
    * 本文に「いま測って送り直せ」と頼む。
@@ -42,6 +47,8 @@ export function PageFrame({ src, title }: { src: string; title: string }) {
 
       const reported = Number(message.height);
       if (!Number.isFinite(reported)) return;
+      answered.current = true;
+      setUnreachable(false);
       setHeight(Math.min(Math.max(Math.ceil(reported), MIN_HEIGHT), MAX_HEIGHT));
     };
 
@@ -51,6 +58,15 @@ export function PageFrame({ src, title }: { src: string; title: string }) {
     // （1回目は本文の script がまだ走っていないことがある）。
     const timers = [0, 60, 240, 800, 2000].map((delay) => window.setTimeout(requestHeight, delay));
 
+    // 本文には必ず高さ通知が入っている。返事が無いということは、読み込まれたのが
+    // 本文ではない（配信先の 404 ページなど）。黙って 404 を枠内に見せると原因が
+    // 分からないので、アプリ側から言う。
+    timers.push(
+      window.setTimeout(() => {
+        if (!answered.current) setUnreachable(true);
+      }, LOAD_TIMEOUT_MS),
+    );
+
     return () => {
       window.removeEventListener('message', onMessage);
       for (const timer of timers) window.clearTimeout(timer);
@@ -58,14 +74,37 @@ export function PageFrame({ src, title }: { src: string; title: string }) {
   }, [requestHeight]);
 
   return (
-    <iframe
-      ref={frameRef}
-      src={src}
-      title={title}
-      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-      onLoad={requestHeight}
-      style={{ height: `${height}px` }}
-      className="block w-full border-0 bg-bg-elevated"
-    />
+    <>
+      {unreachable ? (
+        <div className="border-b border-border-base bg-bg-subtle px-4 py-3 text-sm">
+          <p className="font-medium text-fg">本文を読み込めませんでした。</p>
+          <p className="mt-1 text-fg-muted">
+            配信先に本文がありません。
+            <code className="mx-1 font-mono text-xs text-fg">npm run index</code>
+            を実行して
+            <code className="mx-1 font-mono text-xs text-fg">public/pages/</code>
+            を作り直すと直ることがあります。
+          </p>
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block font-mono text-xs text-accent underline decoration-dotted"
+          >
+            {src} を直接開く ↗
+          </a>
+        </div>
+      ) : null}
+
+      <iframe
+        ref={frameRef}
+        src={src}
+        title={title}
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+        onLoad={requestHeight}
+        style={{ height: `${height}px` }}
+        className="block w-full border-0 bg-bg-elevated"
+      />
+    </>
   );
 }

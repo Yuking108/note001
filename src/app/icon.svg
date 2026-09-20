@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="note001">
+  <!--
+    App Router の metadata file convention。ここに置くと <link rel="icon"> が自動で入る。
+    色は globals.css のトークンと同じ（accent と bg）。ブラウザのタブが明色でも暗色でも
+    読めるよう、地をアクセント色で塗って N を抜く。
+    ヘッダーの note001 が等幅なので、字形も等幅寄りに——一定のストローク幅、角は落とさない。
+  -->
+  <!--
+    色は fill 属性を既定値として持たせ、CSS では暗色時の上書きだけを行う。
+    SVG 内部の <style> を無視するレンダラーでも、明色版がそのまま出る。
+  -->
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #e8925c; }
+      .mark { fill: #17161a; }
+    }
+  </style>
+
+  <rect class="tile" fill="#b4551f" width="32" height="32" rx="7" />
+
+  <!--
+    16px まで落ちても N に見えることを優先し、字幅を広く・ストロークを細めに取って
+    カウンター（斜線と縦棒が作る三角の空き）を確保する。斜線は縦棒よりわずかに細い。
+  -->
+  <g class="mark" fill="#fbfaf9">
+    <rect x="5" y="6" width="4.4" height="20" />
+    <rect x="22.6" y="6" width="4.4" height="20" />
+    <path d="M9.4 6h4.8l8.4 20h-4.8z" />
+  </g>
+</svg>

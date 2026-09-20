@@ -385,10 +385,14 @@ function syncPage(slug: string): void {
   const targetDir = path.join(PUBLIC_PAGES_DIR, slug);
   fs.mkdirSync(targetDir, { recursive: true });
 
+  /** このページで配信すべき相対パス。これに無いものは同期後に消す */
+  const expected = new Set<string>();
+
   const copyTree = (from: string, to: string) => {
     for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
       // メタデータは索引に入るので配信しない
       if (entry.name === META_FILENAME && from === sourceDir) continue;
+      expected.add(path.relative(targetDir, path.join(to, entry.name)));
       const source = path.join(from, entry.name);
       const target = path.join(to, entry.name);
 
@@ -407,6 +411,19 @@ function syncPage(slug: string): void {
   };
 
   copyTree(sourceDir, targetDir);
+
+  // content/ 側で消した同居ファイルが配信先に残らないようにする
+  const prune = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (!expected.has(path.relative(targetDir, full))) {
+        fs.rmSync(full, { recursive: true, force: true });
+        continue;
+      }
+      if (entry.isDirectory()) prune(full);
+    }
+  };
+  prune(targetDir);
 }
 
 // ---------------------------------------------------------------------------
@@ -521,10 +538,17 @@ function main(): void {
   fs.mkdirSync(GENERATED_DIR, { recursive: true });
   fs.writeFileSync(INDEX_FILE, `${JSON.stringify(index, null, 2)}\n`, 'utf8');
 
-  // 配信用コピーは毎回作り直す（消したページが残り続けるのを防ぐ）
-  fs.rmSync(PUBLIC_PAGES_DIR, { recursive: true, force: true });
+  // 配信用コピーは「上書き → 余分を削除」の順で同期する。
+  // 全削除してから作り直すと、dev サーバが動いている最中は本文が一瞬消える。
+  // その隙に来たリクエストは 404 になり、ブラウザや dev サーバがそれを掴んだままになる。
   fs.mkdirSync(PUBLIC_PAGES_DIR, { recursive: true });
   for (const page of pages) syncPage(page.id);
+
+  const live = new Set(pages.map((page) => page.id));
+  for (const entry of fs.readdirSync(PUBLIC_PAGES_DIR, { withFileTypes: true })) {
+    if (live.has(entry.name)) continue;
+    fs.rmSync(path.join(PUBLIC_PAGES_DIR, entry.name), { recursive: true, force: true });
+  }
 
   report();
 
