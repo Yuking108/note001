@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# 生成物（content/ が単一の真実。生成物はコミットしない）
+src/generated/
+public/pages/
+
+.DS_Store
+.env*.local

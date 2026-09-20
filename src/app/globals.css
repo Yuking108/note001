@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+/*
+ * アプリ本体 UI のテーマトークン。
+ * ページ本文（content/pages/**）は iframe で隔離され自前の style を持つため、
+ * ここのトークンは本文には一切影響しない。
+ */
+:root {
+  --bg: #fbfaf9;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #f3f1ef;
+  --fg: #1c1a18;
+  --fg-muted: #6b645d;
+  --fg-faint: #9a938c;
+  --border: #e3dfdb;
+  --border-strong: #cdc7c1;
+  --accent: #b4551f;
+  --accent-soft: #f6e9e0;
+  --focus: #b4551f;
+}
+
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --bg: #17161a;
+    --bg-elevated: #1f1e23;
+    --bg-subtle: #26252b;
+    --fg: #eceaf0;
+    --fg-muted: #a39fab;
+    --fg-faint: #736f7c;
+    --border: #322f38;
+    --border-strong: #454150;
+    --accent: #e8925c;
+    --accent-soft: #33261d;
+    --focus: #e8925c;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #17161a;
+  --bg-elevated: #1f1e23;
+  --bg-subtle: #26252b;
+  --fg: #eceaf0;
+  --fg-muted: #a39fab;
+  --fg-faint: #736f7c;
+  --border: #322f38;
+  --border-strong: #454150;
+  --accent: #e8925c;
+  --accent-soft: #33261d;
+  --focus: #e8925c;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-border-base: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans',
+    'Noto Sans JP', Meiryo, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

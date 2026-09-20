@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ctrl+B のベベルとベベルモディファイアの使い分け</title>
+    <style>
+      /* ------------------------------------------------------------------
+         パレットは Blender の辺属性の色彩から採った。
+         アクセント＝ベベルウェイトの琥珀、対比色＝シャープ辺のシアン。
+         ニュートラルは青寄りのグラファイト。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #9c5f06;
+        --accent-ink: #7a4a05;
+        --accent-bg: #f7ecd8;
+        --accent-line: #dcbe86;
+
+        --sharp: #1b6f80;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+        --cut: 13px; /* 面取り量。この文書の主題そのものを装飾に使う */
+      }
+
+      /* 暗色：色の定義をここだけに置かない（既定は必ず :root にある） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #e9a94a;
+          --accent-ink: #f2c07a;
+          --accent-bg: #2e2415;
+          --accent-line: #5b4520;
+
+          --sharp: #59b6c7;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透ける */
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      /* ---------------- 見出し部 ---------------- */
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.75rem, 1.3rem + 2.1vw, 2.75rem);
+        line-height: 1.32;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      /* ---------------- 設問 ---------------- */
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        clip-path: polygon(
+          0 0,
+          calc(100% - var(--cut)) 0,
+          100% var(--cut),
+          100% 100%,
+          var(--cut) 100%,
+          0 calc(100% - var(--cut))
+        );
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+
+      /* ---------------- 節 ---------------- */
+
+      section {
+        margin-top: 3.75rem;
+      }
+
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+
+      h3 {
+        font-family: var(--font-body);
+        font-weight: 700;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        letter-spacing: 0.04em;
+        color: var(--ink-2);
+        margin: 2.5rem 0 0.9rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .kbd {
+        font-family: var(--font-mono);
+        font-size: 0.84em;
+        font-weight: 600;
+        padding: 0.12em 0.45em;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      /* ---------------- 表 ---------------- */
+
+      /* 広い要素はこの内側でスクロールさせ、文書自体は横に伸ばさない */
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+        margin: 1.5rem 0;
+      }
+
+      table {
+        width: 100%;
+        min-width: 30rem;
+        border-collapse: collapse;
+        font-size: 0.93rem;
+      }
+      thead th {
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        text-align: left;
+        padding: 0 1rem 0.6rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      tbody td {
+        padding: 0.85rem 1rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      tbody th {
+        text-align: left;
+        font-weight: 700;
+        padding: 0.85rem 1.25rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      tbody th small {
+        display: block;
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+        color: var(--ink-3);
+      }
+      tr.pick th,
+      tr.pick td {
+        background: var(--accent-bg);
+      }
+      tr.pick th {
+        box-shadow: inset 3px 0 0 var(--accent);
+        padding-left: 1rem;
+      }
+
+      .scope {
+        display: inline-block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+        padding: 0.18em 0.6em;
+        border: 1px solid var(--line);
+        color: var(--ink-2);
+        white-space: nowrap;
+      }
+      .scope.is-pick {
+        border-color: var(--accent-line);
+        color: var(--accent-ink);
+      }
+
+      /* ---------------- 手順 ---------------- */
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+      ol.steps .note {
+        display: block;
+        font-size: 0.88rem;
+        color: var(--ink-2);
+      }
+
+      /* ---------------- 補足枠 ---------------- */
+
+      .callout {
+        max-width: var(--measure);
+        margin: 1.75rem 0;
+        padding: 1.15rem 1.35rem;
+        background: var(--surface-2);
+        border: 1px solid var(--line-soft);
+        border-left: 2px solid var(--accent);
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .callout .label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .callout p {
+        margin: 0;
+        max-width: none;
+      }
+
+      /* ---------------- 判断基準 ---------------- */
+
+      .decision {
+        margin-top: 1.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .decision .prompt {
+        max-width: none;
+        margin: 0;
+        padding: 1.1rem 1.35rem;
+        font-family: var(--font-display);
+        font-size: 1.1rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        color: var(--accent-ink);
+        text-wrap: pretty;
+      }
+      .branches {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+        gap: 1rem;
+      }
+      .branch {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        padding: 1.15rem 1.3rem 1.3rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        clip-path: polygon(
+          0 0,
+          calc(100% - var(--cut)) 0,
+          100% var(--cut),
+          100% 100%,
+          0 100%
+        );
+      }
+      .branch .cond {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        color: var(--ink-3);
+      }
+      .branch .verdict {
+        font-family: var(--font-display);
+        font-size: 1.28rem;
+        letter-spacing: 0.02em;
+        color: var(--ink);
+      }
+      .branch .verdict .kbd {
+        font-size: 1rem;
+        vertical-align: 0.08em;
+      }
+      .branch .why {
+        margin: 0;
+        max-width: none;
+        font-size: 0.9rem;
+        color: var(--ink-2);
+      }
+
+      /* ---------------- 二段組の対比 ---------------- */
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+        gap: 1.75rem 2.5rem;
+        margin-top: 1.5rem;
+      }
+      .split h4 {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        font-weight: 400;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 0 0 0.85rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line);
+        color: var(--ink-2);
+      }
+      .split h4.is-cut {
+        border-bottom-color: var(--accent-line);
+        color: var(--accent-ink);
+      }
+      .split h4.is-mod {
+        border-bottom-color: var(--sharp);
+        color: var(--sharp);
+      }
+
+      ul.ticks {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        font-size: 0.95rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.78em;
+        width: 6px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+
+      /* ---------------- 実務の流れ ---------------- */
+
+      ol.workflow {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: wf;
+        margin: 1.5rem 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      ol.workflow > li {
+        counter-increment: wf;
+        display: grid;
+        grid-template-columns: 3.25rem 1fr;
+        gap: 1.25rem;
+        padding: 1.05rem 0;
+        border-top: 1px solid var(--line-soft);
+      }
+      ol.workflow > li:last-child {
+        border-bottom: 1px solid var(--line-soft);
+      }
+      ol.workflow > li::before {
+        content: '0' counter(wf);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        padding-top: 0.18em;
+      }
+
+      /* ---------------- まとめ ---------------- */
+
+      .summary {
+        margin-top: 1.5rem;
+        padding: 1.5rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        clip-path: polygon(
+          var(--cut) 0,
+          100% 0,
+          100% calc(100% - var(--cut)),
+          calc(100% - var(--cut)) 100%,
+          0 100%,
+          0 var(--cut)
+        );
+      }
+      .summary ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .summary li {
+        position: relative;
+        padding-left: 1.4rem;
+      }
+      .summary li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.72em;
+        width: 8px;
+        height: 8px;
+        background: var(--accent);
+        clip-path: polygon(0 0, 100% 0, 100% 100%);
+      }
+
+      /* ---------------- 関連 ---------------- */
+
+      footer {
+        margin-top: 4rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      footer .label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      footer ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.75rem;
+      }
+      footer li {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        color: var(--ink-2);
+        padding: 0.25rem 0.65rem;
+        border: 1px solid var(--line-soft);
+        background: var(--surface);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+        ol.workflow > li {
+          grid-template-columns: 2.5rem 1fr;
+          gap: 0.9rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Modeling</span
+          ><span class="dot"></span> <span>Bevel</span><span class="dot"></span>
+          <span>2026.09.15</span>
+        </div>
+        <h1>Ctrl+B のベベルと<br />ベベルモディファイアの使い分け</h1>
+        <p class="standfirst">
+          「モディファイアは全体にかかる」は誤解。そして Ctrl+B
+          は禁止ではない。判断はひとつの問いに収束する。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>
+          ベベル後の編集では <span class="kbd">Ctrl</span>+<span class="kbd">B</span>
+          のベベルは使わないの？ ベベルモディファイアは全体にかかるのでは？
+        </p>
+      </div>
+
+      <section>
+        <h2>
+          <span class="lead">Answer 01</span
+          >ベベルモディファイアは「全体にかかる」わけではない
+        </h2>
+        <p>
+          制限方法（Limit
+          Method）で、どの辺にかけるかを完全にコントロールできる。ここを理解すると使い勝手が変わる。
+        </p>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">制限方法</th>
+                <th scope="col">かかる範囲</th>
+                <th scope="col">挙動</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">なし<small>None</small></th>
+                <td><span class="scope">全辺</span></td>
+                <td>全部の辺にかかる。これが「全体にかかる」状態</td>
+              </tr>
+              <tr>
+                <th scope="row">角度<small>Angle</small></th>
+                <td><span class="scope">角度で自動</span></td>
+                <td>
+                  既定 30°。設定角度より鋭い辺だけ。平らに繋がっている部分は無視される
+                </td>
+              </tr>
+              <tr class="pick">
+                <th scope="row">ウェイト<small>Weight</small></th>
+                <td><span class="scope is-pick">辺ごと指名</span></td>
+                <td>
+                  ベベルウェイトが 0 より大きい辺だけ。<strong>辺ごとの完全な指名制</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">頂点グループ<small>Vertex Group</small></th>
+                <td><span class="scope">グループ単位</span></td>
+                <td>頂点グループに含まれる部分だけ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          つまり「狙った辺だけベベル」は<strong>ウェイト</strong>でできる。既定が「角度」なので、何もしなくても平面部分は落ちない。
+        </p>
+
+        <h3>ウェイトの付け方</h3>
+        <ol class="steps">
+          <li><span>編集モードで辺を選択</span></li>
+          <li>
+            <span
+              ><span class="kbd">Ctrl</span>+<span class="kbd">E</span> →
+              <span class="ui">ベベルウェイト</span> でドラッグして 1 にする
+              <span class="note"
+                >または N パネル → アイテム → 辺データ → 平均ベベルウェイト に直接 1
+                を入力</span
+              ></span
+            >
+          </li>
+          <li><span>モディファイアの制限方法を「ウェイト」に</span></li>
+        </ol>
+
+        <h3>ウェイトは幅の倍率にもなる</h3>
+        <div class="callout">
+          <span class="label">幅 × ウェイト値</span>
+          <p>
+            制限方法がウェイトのとき、ベベル幅は<strong>辺のウェイト値で掛け算される</strong>。ウェイト
+            1 の辺は指定幅どおり、0.5 の辺は半分の幅。
+          </p>
+          <p>→ ひとつのモディファイアで「太い面取り」と「細い面取り」を作り分けられる。</p>
+        </div>
+        <p>
+          さらに細かく分けたいときは、ベベルモディファイアを 2
+          つ以上重ね、それぞれ別の頂点グループで制限する。
+        </p>
+      </section>
+
+      <section>
+        <h2>
+          <span class="lead">Answer 02</span><span class="kbd">Ctrl</span>+<span
+            class="kbd"
+            >B</span
+          >（破壊的ベベル）も普通に使う
+        </h2>
+        <p>
+          前のノートの「編集中はモディファイアで持つ」は、<strong>見た目の角の丸みが目的の場合</strong>の話。Ctrl+B
+          が正解の場面はちゃんとある。
+        </p>
+
+        <div class="decision">
+          <p class="prompt">
+            ベベルで出来た面の上に、さらにモデリングを続ける必要があるか？
+          </p>
+          <div class="branches">
+            <div class="branch">
+              <span class="cond">続ける</span>
+              <span class="verdict"
+                ><span class="kbd">Ctrl</span>+<span class="kbd">B</span></span
+              >
+              <p class="why">実体のあるジオメトリが必要だから。</p>
+            </div>
+            <div class="branch">
+              <span class="cond">角を丸めたいだけ</span>
+              <span class="verdict">モディファイア</span>
+              <p class="why">形は後からいくらでも調整できる。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="split">
+          <div>
+            <h4 class="is-cut">Ctrl+B を使う場面</h4>
+            <ul class="ticks">
+              <li>
+                面取りした面に<strong>穴を開ける・押し出す・別のディテールを乗せる</strong>
+              </li>
+              <li>
+                サブディビジョンサーフェス前提の<strong>サポートエッジ（コントロールループ）</strong>を意図した位置に入れる
+              </li>
+              <li>辺ループを増やす手段として使う（分割の代用）</li>
+              <li><strong>頂点ベベル（Ctrl+Shift+B）</strong>で角を落とす</li>
+              <li>モディファイアが破綻する<strong>複雑な交差部分</strong>を手で処理する</li>
+              <li>
+                スカルプト / リトポ / ゲーム書き出しなど、<strong>メッシュを確定させる</strong>段階
+              </li>
+              <li>プロファイル（断面カーブ）を凝って、その形を実体として持ちたいとき</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="is-mod">モディファイアが向く場面</h4>
+            <ul class="ticks">
+              <li>最後の仕上げとしての面取り・角丸</li>
+              <li>幅や段数を<strong>後から何度も調整したい</strong></li>
+              <li>ベースの形をまだ触る（辺を動かす・比率を変える）</li>
+              <li>同じ設定を複数オブジェクトに使い回す（コピー / リンク）</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">In practice</span>実務的な組み合わせ方</h2>
+        <p>多くの場合は併用する。</p>
+        <ol class="workflow">
+          <li>
+            <span
+              ><span class="kbd">Ctrl</span>+<span class="kbd">B</span> は<strong
+                >形を作るため</strong
+              >に使う（構造としての面取り、サポートループ）</span
+            >
+          </li>
+          <li>
+            <span
+              >最終的な<strong>見た目の角丸</strong>はベベルモディファイアに任せ、辺にウェイトを付けて指名する</span
+            >
+          </li>
+          <li>
+            <span
+              >書き出しが必要になった時点でモディファイアを適用（複製をバックアップに残す）</span
+            >
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Summary</span>まとめ</h2>
+        <div class="summary">
+          <ul>
+            <li>
+              「ベベルモディファイア＝全体にかかる」は誤解。制限方法が既定で角度、<strong>ウェイトにすれば辺ごとの指名制</strong>。
+            </li>
+            <li>
+              <span class="kbd">Ctrl</span>+<span class="kbd">B</span>
+              は禁止ではない。<strong>ベベル後の面の上に作業を続けるなら Ctrl+B</strong>、<strong
+                >角を丸めるだけならモディファイア</strong
+              >。
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <footer>
+        <span class="label">関連ノート</span>
+        <ul>
+          <li>Q&amp;A まとめ</li>
+          <li>Q&amp;A_ベベル後の編集が大変な問題</li>
+        </ul>
+      </footer>
+    </main>
+  </body>
+</html>

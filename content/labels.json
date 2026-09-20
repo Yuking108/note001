@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "labels": [
+    {
+      "path": "技術",
+      "description": "技術的な知識の軸。原則としてこれ自体は付けず、子ラベルで分類する",
+      "aliases": ["tech"]
+    },
+    {
+      "path": "技術/SQLite",
+      "description": "SQLite 本体と拡張機能（FTS5 など）に関する知識",
+      "aliases": ["sqlite", "SQLite3"]
+    },
+    {
+      "path": "技術/全文検索",
+      "description": "全文検索の設計・実装・日本語の分割（N-gram、形態素解析）",
+      "aliases": ["fulltext", "全文検索エンジン"]
+    },
+    {
+      "path": "技術/Next.js",
+      "description": "Next.js の App Router、静的出力、ビルド周りの知識",
+      "aliases": ["nextjs", "next"]
+    },
+    {
+      "path": "技術/HTML",
+      "description": "HTML・CSS・SVG の書き方、iframe や CSP といったブラウザの仕組み",
+      "aliases": ["html", "css"]
+    },
+    {
+      "path": "技術/note001",
+      "description": "この知識ベースアプリ自身の設計・運用に関する知識",
+      "aliases": ["note001"]
+    },
+    {
+      "path": "仕事",
+      "description": "仕事に関する知識の軸。原則としてこれ自体は付けず、子ラベルで分類する"
+    },
+    {
+      "path": "生活",
+      "description": "暮らしに関する知識の軸。原則としてこれ自体は付けず、子ラベルで分類する"
+    },
+    {
+      "path": "形式",
+      "description": "記述の性質の軸。原則としてこれ自体は付けず、子ラベルで分類する"
+    },
+    {
+      "path": "形式/調べ物",
+      "description": "調査してまとめた結果。あとで参照する前提のもの",
+      "aliases": ["調査"]
+    },
+    {
+      "path": "形式/手順",
+      "description": "手順書・レシピ。上から順に実行すれば再現できる形のもの",
+      "aliases": ["手順書", "how-to"]
+    },
+    {
+      "path": "形式/読書メモ",
+      "description": "本や記事を読んで書き残したもの。出典が外部にある",
+      "aliases": ["読書"]
+    },
+    {
+      "path": "形式/アイデア",
+      "description": "思いついたこと・検討中の構想。まだ裏は取れていない",
+      "aliases": ["idea", "着想"]
+    },
+    {
+      "path": "状態",
+      "description": "情報の信頼度の軸。原則としてこれ自体は付けず、子ラベルで分類する"
+    },
+    {
+      "path": "状態/確定",
+      "description": "内容を確認済みで、そのまま信じて使ってよいもの",
+      "aliases": ["確定"]
+    },
+    {
+      "path": "状態/検証中",
+      "description": "まだ裏取りや実験が済んでいないもの。引用する前に確認が必要",
+      "aliases": ["検証中", "wip"]
+    },
+    {
+      "path": "状態/要更新",
+      "description": "情報が古くなっている可能性が高く、書き直しが必要なもの",
+      "aliases": ["要更新", "stale"]
+    }
+  ],
+  "renamed": {}
+}

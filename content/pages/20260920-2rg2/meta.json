@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "20260920-2rg2",
+  "title": "SQLite FTS5 で日本語を引く",
+  "summary": "既定の unicode61 は日本語を分割しないため一文が1トークンになる。trigram トークナイザで部分一致を引けるが、2文字語が引けず索引も膨らむ。",
+  "labels": [
+    "技術/SQLite",
+    "技術/全文検索",
+    "形式/調べ物",
+    "状態/検証中"
+  ],
+  "createdAt": "2026-09-20",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "note": "未検証。手元で索引サイズと検索体験を確かめる必要がある"
+  }
+}

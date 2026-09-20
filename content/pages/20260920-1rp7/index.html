@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>iframe sandbox と CSP で本文を隔離する</title>
+    <style>
+      :root {
+        --bg: #fbfaf9;
+        --panel: #ffffff;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --accent-soft: #f6e9e0;
+        --code-bg: #f3f1ef;
+        --deny: #a3302a;
+        --deny-soft: #f8e8e6;
+        --allow: #2f6b3f;
+        --allow-soft: #e6f0e8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --panel: #1f1e23;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --accent-soft: #33261d;
+          --code-bg: #26252b;
+          --deny: #e88d86;
+          --deny-soft: #32211f;
+          --allow: #7fc48f;
+          --allow-soft: #1d2a20;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        line-height: 1.85;
+        font-size: 16px;
+      }
+      main {
+        max-width: 780px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+      h1 {
+        font-size: 1.7rem;
+        line-height: 1.4;
+        margin: 0 0 0.5rem;
+        letter-spacing: -0.01em;
+      }
+      .lede {
+        color: var(--fg-muted);
+        margin: 0 0 2.5rem;
+      }
+      h2 {
+        font-size: 1.2rem;
+        margin: 2.75rem 0 0.9rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 1.75rem 0 0.5rem;
+      }
+      p {
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 0.87em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      pre {
+        overflow-x: auto;
+        max-width: 100%;
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.65;
+        font-size: 0.83rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      ul {
+        margin: 0 0 1.2rem;
+        padding-left: 1.4rem;
+      }
+      li {
+        margin-bottom: 0.4rem;
+      }
+      figure {
+        margin: 1.75rem 0;
+      }
+      figcaption {
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.6rem;
+      }
+      svg {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.9rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.5rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--code-bg);
+        white-space: nowrap;
+      }
+      td code {
+        white-space: nowrap;
+      }
+      .verdict {
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .deny {
+        color: var(--deny);
+      }
+      .allow {
+        color: var(--allow);
+      }
+      .callout {
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--deny);
+        border-radius: 0 8px 8px 0;
+        background: var(--deny-soft);
+        padding: 0.9rem 1.1rem;
+        margin: 1.5rem 0;
+      }
+      .callout strong {
+        display: block;
+        margin-bottom: 0.2rem;
+      }
+      .callout p:last-child {
+        margin: 0;
+      }
+      .insight {
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--allow);
+        border-radius: 0 8px 8px 0;
+        background: var(--allow-soft);
+        padding: 0.9rem 1.1rem;
+        margin: 1.5rem 0;
+      }
+      .insight p:last-child {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>iframe sandbox と CSP で本文を隔離する</h1>
+      <p class="lede">
+        生成された HTML に JS を許しつつ、アプリ本体を壊させない構成。note001 が実際に使っている設定と、その理由。
+      </p>
+
+      <h2>二重の境界</h2>
+      <p>
+        本文 HTML は React ツリーに入れず、<code>public/pages/</code> から iframe で読み込む。境界は2つある。
+        <strong>sandbox</strong> が内側から外（アプリ）への手出しを止め、<strong>CSP</strong> が内側から外（ネットワーク）への通信を止める。
+      </p>
+
+      <figure>
+        <svg viewBox="0 0 700 330" role="img" aria-labelledby="diagram-title diagram-desc">
+          <title id="diagram-title">sandbox と CSP が止めている経路</title>
+          <desc id="diagram-desc">
+            アプリのオリジンの中に opaque origin の iframe があり、親の DOM への参照は sandbox
+            が遮断し、外部ネットワークへの通信は CSP が遮断する。高さの通知だけが postMessage
+            で親に届く。
+          </desc>
+
+          <!-- アプリ側 -->
+          <rect
+            x="8"
+            y="8"
+            width="420"
+            height="314"
+            rx="12"
+            fill="var(--panel)"
+            stroke="var(--border)"
+            stroke-width="1.5"
+          />
+          <text x="26" y="34" font-size="13" font-weight="600" fill="var(--fg)">
+            アプリ（note001 のオリジン）
+          </text>
+          <text x="26" y="54" font-size="11" fill="var(--fg-muted)">DOM / localStorage / Cookie</text>
+
+          <!-- iframe -->
+          <rect
+            x="26"
+            y="76"
+            width="384"
+            height="220"
+            rx="10"
+            fill="var(--bg)"
+            stroke="var(--accent)"
+            stroke-width="1.5"
+            stroke-dasharray="5 4"
+          />
+          <text x="44" y="102" font-size="12.5" font-weight="600" fill="var(--accent)">
+            iframe（opaque origin）
+          </text>
+          <text x="44" y="121" font-size="11" fill="var(--fg-muted)">
+            sandbox="allow-scripts allow-popups"
+          </text>
+
+          <rect
+            x="44"
+            y="136"
+            width="348"
+            height="62"
+            rx="8"
+            fill="var(--code-bg)"
+            stroke="var(--border)"
+          />
+          <text x="60" y="160" font-size="12" fill="var(--fg)">本文 HTML</text>
+          <text x="60" y="180" font-size="11" fill="var(--fg-muted)">
+            インライン CSS / SVG / JS で完結
+          </text>
+
+          <!-- 親 DOM への遮断 -->
+          <path
+            d="M120 136 L120 62"
+            stroke="var(--deny)"
+            stroke-width="1.5"
+            fill="none"
+            marker-end="url(#arrow-deny)"
+          />
+          <g transform="translate(120 100)">
+            <circle r="11" fill="var(--deny-soft)" stroke="var(--deny)" stroke-width="1.5" />
+            <path d="M-5 -5 L5 5 M5 -5 L-5 5" stroke="var(--deny)" stroke-width="2" />
+          </g>
+          <text x="140" y="104" font-size="11" fill="var(--deny)">sandbox が遮断</text>
+
+          <!-- 高さ通知は通る -->
+          <path
+            d="M300 218 L300 250 L470 250"
+            stroke="var(--allow)"
+            stroke-width="1.5"
+            fill="none"
+            marker-end="url(#arrow-allow)"
+          />
+          <text x="306" y="240" font-size="11" fill="var(--allow)">postMessage（高さ）</text>
+
+          <!-- 外部ネットワーク -->
+          <rect
+            x="476"
+            y="76"
+            width="212"
+            height="92"
+            rx="10"
+            fill="var(--panel)"
+            stroke="var(--border)"
+            stroke-width="1.5"
+          />
+          <text x="494" y="104" font-size="12.5" font-weight="600" fill="var(--fg)">
+            外部ネットワーク
+          </text>
+          <text x="494" y="124" font-size="11" fill="var(--fg-muted)">CDN / フォント / API</text>
+          <text x="494" y="144" font-size="11" fill="var(--fg-muted)">外部画像 / fetch</text>
+
+          <!-- CSP 遮断 -->
+          <path
+            d="M392 167 L476 130"
+            stroke="var(--deny)"
+            stroke-width="1.5"
+            fill="none"
+            marker-end="url(#arrow-deny)"
+          />
+          <g transform="translate(434 148)">
+            <circle r="11" fill="var(--deny-soft)" stroke="var(--deny)" stroke-width="1.5" />
+            <path d="M-5 -5 L5 5 M5 -5 L-5 5" stroke="var(--deny)" stroke-width="2" />
+          </g>
+          <text x="452" y="196" font-size="11" fill="var(--deny)">CSP が遮断</text>
+
+          <rect
+            x="476"
+            y="228"
+            width="212"
+            height="44"
+            rx="10"
+            fill="var(--allow-soft)"
+            stroke="var(--allow)"
+            stroke-width="1.5"
+          />
+          <text x="494" y="256" font-size="12" fill="var(--fg)">親が iframe の高さを合わせる</text>
+
+          <defs>
+            <marker id="arrow-deny" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--deny)" />
+            </marker>
+            <marker id="arrow-allow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--allow)" />
+            </marker>
+          </defs>
+        </svg>
+        <figcaption>
+          内側から外へ出る経路はすべて閉じ、高さの通知だけを postMessage で通す。
+        </figcaption>
+      </figure>
+
+      <h2>sandbox に何を許すか</h2>
+      <pre><code>&lt;iframe
+  src="/pages/20260920-1rp7/index.html"
+  sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+&gt;&lt;/iframe&gt;</code></pre>
+
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th>トークン</th>
+              <th></th>
+              <th>理由</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>allow-scripts</code></td>
+              <td class="verdict allow">許可</td>
+              <td>図解やインタラクティブな説明を動かすため</td>
+            </tr>
+            <tr>
+              <td><code>allow-popups</code></td>
+              <td class="verdict allow">許可</td>
+              <td>外部リンクを別タブで開ける。本文が外部ページに置き換わるのを防ぐ</td>
+            </tr>
+            <tr>
+              <td><code>allow-popups-to-escape-sandbox</code></td>
+              <td class="verdict allow">許可</td>
+              <td>開いた先のタブに sandbox を継承させない（外部サイトが壊れて見えるのを防ぐ）</td>
+            </tr>
+            <tr>
+              <td><code>allow-same-origin</code></td>
+              <td class="verdict deny">付けない</td>
+              <td>アプリの DOM・localStorage・Cookie に触れられなくする</td>
+            </tr>
+            <tr>
+              <td><code>allow-forms</code></td>
+              <td class="verdict deny">付けない</td>
+              <td>本文にフォーム送信をさせる理由がない</td>
+            </tr>
+            <tr>
+              <td><code>allow-modals</code></td>
+              <td class="verdict deny">付けない</td>
+              <td><code>alert()</code> が画面を止めるのを防ぐ</td>
+            </tr>
+            <tr>
+              <td><code>allow-top-navigation</code></td>
+              <td class="verdict deny">付けない</td>
+              <td>本文がアプリ全体を別ページへ飛ばせないようにする</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <strong>allow-scripts と allow-same-origin を同時に付けてはいけない</strong>
+        <p>
+          両方付けると、枠内の文書は親と同一オリジンになり、親の DOM 経由で自分の
+          <code>sandbox</code> 属性を書き換えて再読み込みできる。つまり sandbox が実質無効になる。
+        </p>
+      </div>
+
+      <h2>opaque origin が効いてくる場所</h2>
+      <p>
+        <code>allow-same-origin</code> を外すと、枠内の文書のオリジンは
+        <strong>opaque</strong>（不透明）になる。これは単に「別オリジン扱い」ではなく、
+        <em>どのオリジンとも一致しない</em>状態で、次の2か所で挙動に効く。
+      </p>
+
+      <h3>1. CSP の <code>'self'</code> が使えない</h3>
+      <p>
+        <code>'self'</code> は文書自身のオリジンとの一致で判定される。opaque origin はどの URL とも一致しないため、
+        <code>img-src 'self'</code> と書いても同居させた画像ファイルは読めない。
+        そこで note001 の CSP は <code>'self'</code> を使わず、<code>data:</code> と <code>blob:</code> だけを許す。
+      </p>
+      <pre><code>default-src 'none';
+img-src data: blob:;
+media-src data: blob:;
+font-src data:;
+style-src 'unsafe-inline';
+script-src 'unsafe-inline';
+connect-src 'none';
+frame-src 'none';
+form-action 'none';
+base-uri 'none'</code></pre>
+      <p>
+        結果として、画像は data URI で埋め込む必要がある。外部ホストへの通信は
+        <code>default-src 'none'</code> と <code>connect-src 'none'</code> で全面的に閉じる。
+      </p>
+
+      <div class="insight">
+        <p>
+          <strong>インライン SVG は img-src の制限を受けない。</strong>
+          サブリソースの読み込みではなく、ただのマークアップだから。図解を SVG で直接書けば
+          CSP を緩める必要は一切ない。この記事の図もそれで描いている。
+        </p>
+      </div>
+
+      <h3>2. postMessage の origin が "null" になる</h3>
+      <p>
+        高さの通知を受ける親側で <code>event.origin</code> を検証しようとしても、送信元が opaque origin なので
+        <code>"null"</code> しか来ない。検証は origin ではなく<strong>送信元の window 参照</strong>で行う。
+      </p>
+      <pre><code>const onMessage = (event) =&gt; {
+  const frame = frameRef.current;
+  // origin ではなく source で送信元を確かめる
+  if (frame === null || event.source !== frame.contentWindow) return;
+  if (event.data?.type !== 'note001:height') return;
+  setHeight(Math.ceil(Number(event.data.height)));
+};</code></pre>
+      <p>
+        高さを親から読めないのも opaque origin のせい（<code>contentDocument</code> が読めない）。
+        そのため、ビルド時に本文のコピーへ高さ通知スニペットを注入し、内側から
+        <code>ResizeObserver</code> で測って送る形にしている。
+      </p>
+
+      <h2>meta タグで CSP を書くときの注意</h2>
+      <p>
+        note001 は静的ホスティング前提でヘッダを制御できないため、CSP を
+        <code>&lt;meta http-equiv&gt;</code> で注入している。meta 版では効かないディレクティブがある点に注意する。
+      </p>
+      <ul>
+        <li><code>frame-ancestors</code>、<code>report-uri</code>、<code>sandbox</code> は meta では無視される</li>
+        <li>だから枠の制御は CSP ではなく iframe の <code>sandbox</code> 属性側の責務になる</li>
+        <li>meta は <code>&lt;head&gt;</code> の早い位置に置く。後ろだと先に読み込みが始まった分に効かない</li>
+      </ul>
+
+      <h2>この構成で残るリスク</h2>
+      <ul>
+        <li>
+          <code>script-src 'unsafe-inline'</code> は必須（本文の JS はインライン）。本文を自分で生成している前提に依存している
+        </li>
+        <li>枠内で重い JS が走れば、そのタブは重くなる。隔離は「壊さない」保証で「軽い」保証ではない</li>
+        <li>CSP は実行時の防御。ビルド時にも外部参照を検出して警告を出し、二重に気づけるようにしている</li>
+      </ul>
+    </main>
+  </body>
+</html>

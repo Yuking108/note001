@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SQLite FTS5 で日本語を引く</title>
+    <style>
+      :root {
+        --bg: #fbfaf9;
+        --panel: #ffffff;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --accent-soft: #f6e9e0;
+        --code-bg: #f3f1ef;
+        --warn: #8a5a12;
+        --warn-soft: #f9f0dd;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --panel: #1f1e23;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --accent-soft: #33261d;
+          --code-bg: #26252b;
+          --warn: #d9a861;
+          --warn-soft: #2b2417;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        line-height: 1.85;
+        font-size: 16px;
+      }
+      main {
+        max-width: 780px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+      h1 {
+        font-size: 1.7rem;
+        line-height: 1.4;
+        margin: 0 0 0.5rem;
+        letter-spacing: -0.01em;
+      }
+      .lede {
+        color: var(--fg-muted);
+        margin: 0 0 1.5rem;
+      }
+      h2 {
+        font-size: 1.2rem;
+        margin: 2.75rem 0 0.9rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      p {
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 0.87em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      pre {
+        overflow-x: auto;
+        max-width: 100%;
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.65;
+        font-size: 0.83rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      ul {
+        margin: 0 0 1.2rem;
+        padding-left: 1.4rem;
+      }
+      li {
+        margin-bottom: 0.4rem;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border: 1px solid var(--warn);
+        background: var(--warn-soft);
+        color: var(--warn);
+        border-radius: 999px;
+        padding: 0.15rem 0.7rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        margin-bottom: 2rem;
+      }
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.9rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.5rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--code-bg);
+        white-space: nowrap;
+      }
+
+      /* トライグラム分割のデモ */
+      .demo {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 1.1rem;
+        margin: 1.75rem 0;
+      }
+      .demo label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 0.45rem;
+      }
+      .demo input {
+        width: 100%;
+        font: inherit;
+        font-size: 0.95rem;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      .demo input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .tokens {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.9rem;
+        min-height: 2rem;
+      }
+      .token {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 0.82rem;
+        background: var(--accent-soft);
+        color: var(--accent);
+        border-radius: 5px;
+        padding: 0.15rem 0.45rem;
+      }
+      .demo-note {
+        font-size: 0.82rem;
+        color: var(--fg-muted);
+        margin: 0.7rem 0 0;
+      }
+      .demo-warn {
+        color: var(--warn);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>SQLite FTS5 で日本語を引く</h1>
+      <p class="lede">
+        既定のトークナイザは日本語を分割しない。trigram で引けるようにする方法と、その代償。
+      </p>
+      <p class="status">状態/検証中 — 手元で実行して確かめていない</p>
+
+      <h2>何が問題か</h2>
+      <p>
+        FTS5 の既定トークナイザ <code>unicode61</code> は、英数字以外の文字を区切りとして扱う。
+        日本語は語の間に空白が無いため、<strong>一文がまるごと1トークンになる</strong>。
+        その結果、「知識ベース」で引いても「個人用の知識ベースを作る」にヒットしない。
+      </p>
+
+      <h2>trigram トークナイザ</h2>
+      <p>
+        SQLite 3.34.0 で追加された <code>trigram</code> は、文字列を3文字ずつ1文字送りで切る。
+        言語を知らなくても部分一致が引けるようになる。
+      </p>
+      <pre><code>CREATE VIRTUAL TABLE pages_fts USING fts5(
+  title,
+  summary,
+  body,
+  tokenize = 'trigram'
+);</code></pre>
+
+      <div class="demo">
+        <label for="demo-input">試す: 入力した文字列のトライグラム</label>
+        <input
+          id="demo-input"
+          type="text"
+          value="知識ベース"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="tokens" id="demo-tokens" aria-live="polite"></div>
+        <p class="demo-note" id="demo-note"></p>
+      </div>
+
+      <h2>2文字の検索語が引けない</h2>
+      <p>
+        3文字未満の語からはトライグラムが1つも作れない。「東京」「設計」のような2文字語は
+        FTS5 側では扱えないため、<strong>短い語は <code>LIKE</code> にフォールバックする</strong>設計が必要になる。
+        trigram 索引は <code>LIKE</code> / <code>GLOB</code> の前方一致以外も加速できるので、この併用は無駄にならない。
+      </p>
+
+      <h2>索引の大きさと detail オプション</h2>
+      <p>
+        トライグラムは1文字ずつずらして切るため、トークン数は概ね本文の文字数と同じになる。
+        索引は本文より大きくなりやすい。効くのは <code>detail</code> と contentless。
+      </p>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th>設定</th>
+              <th>効果</th>
+              <th>失うもの</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>detail=full</code>（既定）</td>
+              <td>位置情報あり</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>detail=column</code></td>
+              <td>索引が小さくなる</td>
+              <td>フレーズ検索・<code>NEAR</code></td>
+            </tr>
+            <tr>
+              <td><code>detail=none</code></td>
+              <td>最も小さい</td>
+              <td>フレーズ検索・<code>NEAR</code>・列単位の絞り込み</td>
+            </tr>
+            <tr>
+              <td><code>content=''</code></td>
+              <td>本文を二重に持たない</td>
+              <td>列の値を返せない・再構築できない</td>
+            </tr>
+            <tr>
+              <td><code>content='pages'</code></td>
+              <td>実テーブルを正として参照</td>
+              <td>同期はトリガで自分で保つ必要がある</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>引くときの形</h2>
+      <pre><code>SELECT
+  p.id,
+  p.title,
+  snippet(pages_fts, 2, '&lt;mark&gt;', '&lt;/mark&gt;', '…', 12) AS excerpt,
+  bm25(pages_fts, 10.0, 5.0, 1.0) AS score
+FROM pages_fts
+JOIN pages AS p ON p.rowid = pages_fts.rowid
+WHERE pages_fts MATCH ?
+ORDER BY score      -- bm25 は小さいほど良い
+LIMIT 20;</code></pre>
+      <p>
+        <code>bm25()</code> の引数は列ごとの重み。タイトルと summary を本文より重くすると、
+        知識ベースの検索としては素直な順序になる。
+      </p>
+
+      <h2>note001 で使うとしたら</h2>
+      <p>
+        このアプリは DB を持たない静的構成なので、FTS5 をそのまま使う道は無い。
+        ただし考え方はそのまま効く。全文検索（Phase 3）では、ビルド時に本文からテキストを抽出して
+        <strong>トライグラムの索引を JSON で作り、クライアント側で引く</strong>形になる。
+        2文字語の扱いと索引サイズという2つの問題は、実装が変わっても同じ形で出てくる。
+      </p>
+
+      <h2>確かめるべきこと</h2>
+      <ul>
+        <li>trigram の索引サイズが実際の日本語本文で何倍になるか</li>
+        <li>2文字語のフォールバックを含めた検索体験が許容できるか</li>
+        <li>クライアント側で引く場合、索引 JSON をどこまで分割・遅延読み込みすべきか</li>
+      </ul>
+    </main>
+
+    <script>
+      (function () {
+        var input = document.getElementById('demo-input');
+        var output = document.getElementById('demo-tokens');
+        var note = document.getElementById('demo-note');
+
+        function trigrams(text) {
+          var chars = Array.from(text);
+          var result = [];
+          for (var i = 0; i + 3 <= chars.length; i += 1) {
+            result.push(chars.slice(i, i + 3).join(''));
+          }
+          return result;
+        }
+
+        function render() {
+          var text = input.value;
+          var chars = Array.from(text);
+          var tokens = trigrams(text);
+
+          output.textContent = '';
+          tokens.forEach(function (token) {
+            var span = document.createElement('span');
+            span.className = 'token';
+            span.textContent = token;
+            output.appendChild(span);
+          });
+
+          if (chars.length === 0) {
+            note.textContent = '文字を入力するとトライグラムが出る。';
+          } else if (tokens.length === 0) {
+            note.innerHTML =
+              '<span class="demo-warn">' +
+              chars.length +
+              ' 文字ではトライグラムが作れない。</span> 3文字未満の語は LIKE にフォールバックする必要がある。';
+          } else {
+            note.textContent =
+              chars.length + ' 文字 → ' + tokens.length + ' トークン（文字数 − 2）。';
+          }
+        }
+
+        input.addEventListener('input', render);
+        render();
+      })();
+    </script>
+  </body>
+</html>
