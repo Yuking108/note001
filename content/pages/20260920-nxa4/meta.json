@@ -1,9 +1,15 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "20260920-nxa4",
   "title": "Ctrl+B のベベルとベベルモディファイアの使い分け",
   "summary": "ベベルモディファイアは制限方法をウェイトにすれば辺ごとの指名制になり、「全体にかかる」わけではない。Ctrl+B との分かれ目は「ベベルで出来た面の上にモデリングを続けるか」の一点。",
-  "labels": [],
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/モデリング/ベベル",
+    "形式/Q&A",
+    "横断/非破壊ワークフロー",
+    "状態/確定"
+  ],
   "createdAt": "2026-09-20",
   "updatedAt": "2026-09-20",
   "visibility": "private",

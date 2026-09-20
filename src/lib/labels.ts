@@ -5,7 +5,13 @@
  * 「似ているが違うラベル」の増殖を機械的に止めることがこのモジュールの役目。
  */
 
-import type { IndexedLabel, IndexedPage, LabelRegistry } from './types';
+import {
+  MAIN_LABEL_SEGMENTS,
+  type IndexedLabel,
+  type IndexedPage,
+  type LabelKind,
+  type LabelRegistry,
+} from './types';
 
 export const LABEL_SEPARATOR = '/';
 export const RECOMMENDED_MAX_DEPTH = 3;
@@ -23,11 +29,23 @@ function hasForbiddenChar(segment: string): boolean {
   return false;
 }
 
+export type NormalizeOptions = {
+  /**
+   * レジストリに登録済みの正規表記として扱う。
+   * `After Effects` のように公式表記が空白を含むラベルがあるため、
+   * 登録済みのものには「空白は非推奨」の警告を出さない（label-spec.md §7.3）。
+   */
+  registered?: boolean;
+};
+
 /**
  * ラベルパスを正規化する。**大小文字は保存する**（表示のため）。
  * 比較・重複判定には labelKey() を使う。
  */
-export function normalizeLabelPath(raw: string): { path: string; issues: LabelIssue[] } {
+export function normalizeLabelPath(
+  raw: string,
+  options: NormalizeOptions = {},
+): { path: string; issues: LabelIssue[] } {
   const issues: LabelIssue[] = [];
 
   // 1. NFKC 正規化（全角英数・半角カナのゆらぎを吸収）
@@ -56,8 +74,8 @@ export function normalizeLabelPath(raw: string): { path: string; issues: LabelIs
         message: `使用できない文字（カンマ・制御文字）を含みます: ${JSON.stringify(raw)}`,
       });
     }
-    // 6. 空白は許可するが非推奨
-    if (/\s/.test(segment)) {
+    // 6. 空白は許可するが非推奨（登録済みの正規表記は対象外）
+    if (!options.registered && /\s/.test(segment)) {
       issues.push({
         level: 'warning',
         message: `セグメントに空白が含まれています（非推奨）: ${JSON.stringify(raw)}`,
@@ -124,8 +142,14 @@ export type ResolvedRegistry = {
   resolve: Map<string, string>;
   /** 正規パス -> description */
   descriptions: Map<string, string>;
+  /** 正規パス -> kind（第一階層のみ） */
+  kinds: Map<string, LabelKind>;
   /** 正規パスの一覧（登録順） */
   paths: string[];
+  /** kind が app の第一階層（メインラベルに使えるアプリ）。登録順 */
+  apps: string[];
+  /** アプリ -> そのアプリ配下の2段ラベル（メインラベルの固定リスト）。登録順 */
+  sectionsOf: Map<string, string[]>;
   issues: LabelIssue[];
 };
 
@@ -137,6 +161,7 @@ export type ResolvedRegistry = {
 export function resolveRegistry(registry: LabelRegistry): ResolvedRegistry {
   const resolve = new Map<string, string>();
   const descriptions = new Map<string, string>();
+  const kinds = new Map<string, LabelKind>();
   const paths: string[] = [];
   const issues: LabelIssue[] = [];
 
@@ -153,13 +178,25 @@ export function resolveRegistry(registry: LabelRegistry): ResolvedRegistry {
   };
 
   for (const definition of registry.labels) {
-    const { path, issues: pathIssues } = normalizeLabelPath(definition.path);
+    // 登録済みの正規表記として正規化する（`After Effects` の空白を警告にしない）
+    const { path, issues: pathIssues } = normalizeLabelPath(definition.path, { registered: true });
     issues.push(...pathIssues);
     if (path === '') continue;
 
     if (descriptions.has(path)) {
       issues.push({ level: 'error', message: `ラベルが重複登録されています: ${path}` });
       continue;
+    }
+
+    if (definition.kind !== undefined) {
+      if (labelDepth(path) !== 1) {
+        issues.push({
+          level: 'error',
+          message: `kind は第一階層にだけ指定できます: ${path}`,
+        });
+      } else {
+        kinds.set(path, definition.kind);
+      }
     }
 
     paths.push(path);
@@ -196,7 +233,32 @@ export function resolveRegistry(registry: LabelRegistry): ResolvedRegistry {
     claim(labelKey(fromPath), toPath, '改名前パス');
   }
 
-  return { resolve, descriptions, paths, issues };
+  // メインラベルの固定リストを組む。
+  // 「アプリ」は kind: 'app' を明示した第一階層だけ。形式・横断・状態はここに入らないので、
+  // `形式/Q&A` のような補助軸のラベルがメインラベルとして通ることはない。
+  const apps = paths.filter((path) => kinds.get(path) === 'app');
+  const appKeys = new Map(apps.map((app) => [labelKey(app), app] as const));
+  const sectionsOf = new Map<string, string[]>(apps.map((app) => [app, []]));
+
+  for (const path of paths) {
+    if (labelDepth(path) !== MAIN_LABEL_SEGMENTS) continue;
+    const parent = labelParent(path);
+    if (parent === null) continue;
+    const app = appKeys.get(labelKey(parent));
+    if (app === undefined) continue;
+    sectionsOf.get(app)?.push(path);
+  }
+
+  for (const app of apps) {
+    if ((sectionsOf.get(app) ?? []).length === 0) {
+      issues.push({
+        level: 'error',
+        message: `アプリ "${app}" に第二階層が1つも登録されていません（メインラベルを付けられません）`,
+      });
+    }
+  }
+
+  return { resolve, descriptions, kinds, paths, apps, sectionsOf, issues };
 }
 
 export type LabelResolution =
@@ -231,6 +293,68 @@ export function resolveLabel(raw: string, registry: ResolvedRegistry): LabelReso
   return { ok: true, path: canonical };
 }
 
+/**
+ * メインラベルを解決する（label-spec.md §3・§7.2 のエラー 2〜4）。
+ *
+ * 形式チェックを resolveLabel と分けているのは、メインだけが
+ * 「ちょうど2段」「第一階層は登録済みアプリ」「第二階層は固定リスト」という
+ * 追加の制約を負うため。サブラベルはこの制約を受けない。
+ */
+export function resolveMainLabel(raw: string, registry: ResolvedRegistry): LabelResolution {
+  const resolution = resolveLabel(raw, registry);
+  if (!resolution.ok) return resolution;
+
+  const path = resolution.path;
+  const segments = labelSegments(path);
+
+  if (segments.length !== MAIN_LABEL_SEGMENTS) {
+    return {
+      ok: false,
+      issues: [
+        {
+          level: 'error',
+          message:
+            `メインラベル "${path}" は ${segments.length} 段です` +
+            `（\`<アプリ>/<セクション>\` のちょうど ${MAIN_LABEL_SEGMENTS} 段にしてください）`,
+        },
+      ],
+    };
+  }
+
+  const app = labelParent(path) ?? '';
+  const sections = registry.sectionsOf.get(app);
+
+  if (sections === undefined) {
+    return {
+      ok: false,
+      issues: [
+        {
+          level: 'error',
+          message:
+            `メインラベルの第一階層 "${app}" は登録済みアプリではありません` +
+            `（使えるのは ${registry.apps.join(' / ') || 'なし'}）`,
+        },
+      ],
+    };
+  }
+
+  if (!sections.includes(path)) {
+    return {
+      ok: false,
+      issues: [
+        {
+          level: 'error',
+          message:
+            `メインラベル "${path}" は "${app}" の固定リストにありません` +
+            `（docs/label-spec.md の一覧から選んでください）`,
+        },
+      ],
+    };
+  }
+
+  return resolution;
+}
+
 // ---------------------------------------------------------------------------
 // ツリー構築と絞り込み
 // ---------------------------------------------------------------------------
@@ -241,13 +365,14 @@ export function resolveLabel(raw: string, registry: ResolvedRegistry): LabelReso
  */
 export function buildLabelTree(pages: IndexedPage[], registry: ResolvedRegistry): IndexedLabel[] {
   const selfCounts = new Map<string, number>();
+  const mainCounts = new Map<string, number>();
   const counts = new Map<string, number>();
   const known = new Set<string>(registry.paths);
 
   for (const page of pages) {
     // 1ページが同じ祖先を複数回持っても、祖先の count は1回だけ数える
     const ancestors = new Set<string>();
-    for (const label of page.labels) {
+    for (const label of page.allLabels) {
       selfCounts.set(label, (selfCounts.get(label) ?? 0) + 1);
       for (const ancestor of labelAncestry(label)) {
         known.add(ancestor);
@@ -257,6 +382,9 @@ export function buildLabelTree(pages: IndexedPage[], registry: ResolvedRegistry)
     for (const ancestor of ancestors) {
       counts.set(ancestor, (counts.get(ancestor) ?? 0) + 1);
     }
+    // mainCount は「メインラベルとして直接付いた件数」。祖先には配らない
+    mainCounts.set(page.mainLabel, (mainCounts.get(page.mainLabel) ?? 0) + 1);
+    for (const ancestor of labelAncestry(page.mainLabel)) known.add(ancestor);
   }
 
   // 暗黙の親も含めて全パスを確定させる
@@ -276,29 +404,37 @@ export function buildLabelTree(pages: IndexedPage[], registry: ResolvedRegistry)
   const collator = new Intl.Collator('ja');
   const sortPaths = (a: string, b: string) => collator.compare(a, b);
 
-  return [...known].sort(sortPaths).map((path) => ({
-    path,
-    name: labelName(path),
-    depth: labelDepth(path),
-    parent: labelParent(path),
-    count: counts.get(path) ?? 0,
-    selfCount: selfCounts.get(path) ?? 0,
-    children: (childrenOf.get(path) ?? []).sort(sortPaths),
-    description: registry.descriptions.get(path) ?? '',
-  }));
+  return [...known].sort(sortPaths).map((path) => {
+    const kind = registry.kinds.get(path);
+    return {
+      path,
+      name: labelName(path),
+      depth: labelDepth(path),
+      parent: labelParent(path),
+      count: counts.get(path) ?? 0,
+      selfCount: selfCounts.get(path) ?? 0,
+      mainCount: mainCounts.get(path) ?? 0,
+      children: (childrenOf.get(path) ?? []).sort(sortPaths),
+      description: registry.descriptions.get(path) ?? '',
+      ...(kind === undefined ? {} : { kind }),
+    };
+  });
 }
 
 export type FilterMode = 'and' | 'or';
 
-/** ページが指定ラベル（子孫を含む）に該当するか */
+/**
+ * ページが指定ラベル（子孫を含む）に該当するか。
+ * 判定はメイン / サブを区別せず allLabels を見る（label-spec.md §7.1）。
+ */
 export function pageMatchesLabel(page: IndexedPage, label: string): boolean {
-  return page.labels.some((owned) => isDescendantOrSelf(owned, label));
+  return page.allLabels.some((owned) => isDescendantOrSelf(owned, label));
 }
 
 /** 「直下のみ」判定: そのラベルが直接付いているか */
 export function pageMatchesLabelExactly(page: IndexedPage, label: string): boolean {
   const key = labelKey(label);
-  return page.labels.some((owned) => labelKey(owned) === key);
+  return page.allLabels.some((owned) => labelKey(owned) === key);
 }
 
 export function filterPages(

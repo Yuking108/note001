@@ -77,7 +77,14 @@ export function LabelTree({ labels, selected, onToggle }: Props) {
           <button
             type="button"
             onClick={() => onToggle(path)}
-            title={label.description || label.path}
+            title={[
+              label.path,
+              label.description,
+              // メインラベルとして何件の置き場になっているかは count からは読めないので添える
+              label.mainCount > 0 ? `${label.count} 件（うちメインラベル ${label.mainCount} 件）` : null,
+            ]
+              .filter(Boolean)
+              .join('\n')}
             className={`flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-sm transition-colors ${
               isSelected
                 ? 'bg-accent-soft font-medium text-accent'

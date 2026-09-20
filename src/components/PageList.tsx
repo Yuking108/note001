@@ -50,7 +50,21 @@ export function PageList({ pages, selected, onToggleLabel }: Props) {
             </Link>
 
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              {page.labels.map((label) => (
+              {/* メインラベルは「このページの置き場」。枠線で他と区別する */}
+              <button
+                type="button"
+                onClick={() => onToggleLabel(page.mainLabel)}
+                title={`メインラベル: ${page.mainLabel}`}
+                className={`rounded-full border px-2 py-0.5 font-mono text-[11px] transition-colors ${
+                  selectedKeys.has(labelKey(page.mainLabel))
+                    ? 'border-accent bg-accent-soft text-accent'
+                    : 'border-border-strong text-fg hover:border-accent hover:text-accent'
+                }`}
+              >
+                {page.mainLabel}
+              </button>
+
+              {page.subLabels.map((label) => (
                 <button
                   key={label}
                   type="button"

@@ -1,47 +1,198 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "labels": [
     {
-      "path": "技術",
-      "description": "技術的な知識の軸。原則としてこれ自体は付けず、子ラベルで分類する",
-      "aliases": ["tech"]
+      "path": "Blender",
+      "kind": "app",
+      "description": "対象アプリの軸。第二階層は Blender 5.2 LTS Manual のサイドバー準拠。これ自体はメインラベルにできない（メインは必ず2段）",
+      "aliases": ["blender3d"]
     },
     {
-      "path": "技術/SQLite",
-      "description": "SQLite 本体と拡張機能（FTS5 など）に関する知識",
-      "aliases": ["sqlite", "SQLite3"]
+      "path": "Blender/ユーザーインターフェース",
+      "description": "ウィンドウ・エリア・パネル・操作系など、Blender の UI そのものの仕組み（公式 User Interface）",
+      "aliases": ["User Interface"]
     },
     {
-      "path": "技術/全文検索",
-      "description": "全文検索の設計・実装・日本語の分割（N-gram、形態素解析）",
-      "aliases": ["fulltext", "全文検索エンジン"]
+      "path": "Blender/エディター",
+      "description": "3Dビューポート・アウトライナー・プロパティなど、各エディターの機能とツールバー（公式 Editors）",
+      "aliases": ["Editors"]
     },
     {
-      "path": "技術/Next.js",
-      "description": "Next.js の App Router、静的出力、ビルド周りの知識",
-      "aliases": ["nextjs", "next"]
+      "path": "Blender/シーンとオブジェクト",
+      "description": "オブジェクトの変形・親子付け・コレクション・シーン構成（公式 Scenes & Objects）",
+      "aliases": ["Scenes & Objects"]
     },
     {
-      "path": "技術/HTML",
-      "description": "HTML・CSS・SVG の書き方、iframe や CSP といったブラウザの仕組み",
-      "aliases": ["html", "css"]
+      "path": "Blender/モデリング",
+      "description": "メッシュ編集・モディファイア・カーブ・選択・シェーディング指定など形状を作る作業全般（公式 Modeling）",
+      "aliases": ["Modeling"]
     },
     {
-      "path": "技術/note001",
-      "description": "この知識ベースアプリ自身の設計・運用に関する知識",
-      "aliases": ["note001"]
+      "path": "Blender/モデリング/ベベル",
+      "description": "ベベル（Ctrl+B）とベベルモディファイア、ベベルウェイト。モデリングの3段目サブラベル",
+      "aliases": ["bevel"]
     },
     {
-      "path": "仕事",
-      "description": "仕事に関する知識の軸。原則としてこれ自体は付けず、子ラベルで分類する"
+      "path": "Blender/スカルプトとペイント",
+      "description": "スカルプトモード、テクスチャペイント、頂点ペイント、ウェイトペイント（公式 Sculpting & Painting）",
+      "aliases": ["Sculpting & Painting"]
     },
     {
-      "path": "生活",
-      "description": "暮らしに関する知識の軸。原則としてこれ自体は付けず、子ラベルで分類する"
+      "path": "Blender/グリースペンシル",
+      "description": "グリースペンシルによる2D描画とアニメーション（公式 Grease Pencil）",
+      "aliases": ["Grease Pencil"]
     },
+    {
+      "path": "Blender/アニメーションとリギング",
+      "description": "キーフレーム・ドライバー・アーマチュア・コンストレイント（公式 Animation & Rigging）",
+      "aliases": ["Animation & Rigging"]
+    },
+    {
+      "path": "Blender/物理演算",
+      "description": "流体・剛体・クロス・パーティクル・ソフトボディなどのシミュレーション（公式 Physics）",
+      "aliases": ["Physics"]
+    },
+    {
+      "path": "Blender/レンダリング",
+      "description": "Cycles / EEVEE、マテリアルとシェーダー、ライト、ワールド、カラーマネジメント（公式 Rendering）",
+      "aliases": ["Rendering"]
+    },
+    {
+      "path": "Blender/コンポジティング",
+      "description": "コンポジターのノードとレンダーパスの合成（公式 Compositing）",
+      "aliases": ["Compositing"]
+    },
+    {
+      "path": "Blender/モーショントラッキング",
+      "description": "カメラトラッキング、オブジェクトトラッキング、マスク（公式 Motion Tracking & Masking）",
+      "aliases": ["Motion Tracking & Masking"]
+    },
+    {
+      "path": "Blender/ビデオ編集",
+      "description": "ビデオシーケンサーでの編集・表示設定・書き出し（公式 Video Editing）",
+      "aliases": ["Video Editing"]
+    },
+    {
+      "path": "Blender/ファイルとデータ",
+      "description": "ファイル入出力、アセットライブラリ、リンク / アペンド、データブロック管理（公式 Assets, Files, & Data System。別名はカンマを使えないため除いて登録）",
+      "aliases": ["Assets Files & Data System"]
+    },
+    {
+      "path": "Blender/アドオン",
+      "description": "同梱および外部アドオンの導入と使い方（公式 Add-ons）",
+      "aliases": ["Add-ons"]
+    },
+    {
+      "path": "Blender/高度な設定",
+      "description": "Python スクリプティング、コマンドライン、環境変数などの上級設定（公式 Advanced）",
+      "aliases": ["Advanced"]
+    },
+    {
+      "path": "Blender/トラブルシューティング",
+      "description": "機能に紐づかない不具合（起動しない・クラッシュする・GPU が認識されない等）。機能に紐づく不具合はその機能のセクションへ（公式 Troubleshooting）",
+      "aliases": ["Troubleshooting"]
+    },
+
+    {
+      "path": "After Effects",
+      "kind": "app",
+      "description": "対象アプリの軸。第二階層は After Effects ユーザーガイドのサイドバーを、知識ページの置き場として機能する粒度に統合したもの。これ自体はメインラベルにできない",
+      "aliases": ["AE", "aftereffects"]
+    },
+    {
+      "path": "After Effects/インターフェース",
+      "description": "ワークスペース、パネル、ビューア、ショートカット（元のサイドバー項目「始める」）"
+    },
+    {
+      "path": "After Effects/プロジェクト",
+      "description": "プロジェクトの設定・管理・保存（元のサイドバー項目「プロジェクトでの作業」）"
+    },
+    {
+      "path": "After Effects/コンポジション",
+      "description": "コンポジションの作成・設定・ネスト（元のサイドバー項目「コンポジションの操作」）"
+    },
+    {
+      "path": "After Effects/フッテージと読み込み",
+      "description": "素材の読み込み、解釈、置き換え（元のサイドバー項目「フッテージアイテムを操作する」「ファイルの読み込み」）"
+    },
+    {
+      "path": "After Effects/レイヤー",
+      "description": "レイヤーの作成・整列・プロパティ・親子付け（元のサイドバー項目「レイヤーを操作する」）"
+    },
+    {
+      "path": "After Effects/テキスト",
+      "description": "テキストの作成、アニメーター、バリアブルフォント（元のサイドバー項目「テキストを追加」「テキストのアニメート」「バリアブルフォント軸」）"
+    },
+    {
+      "path": "After Effects/モーショングラフィックス",
+      "description": "モーショングラフィックステンプレート、エッセンシャルグラフィックス（元のサイドバー項目「モーショングラフィックス」）"
+    },
+    {
+      "path": "After Effects/描画とペイント",
+      "description": "シェイプ、マスク、パス、ブラシ（元のサイドバー項目「描画、ペイント、パス」）"
+    },
+    {
+      "path": "After Effects/ロトスコープとマット",
+      "description": "ロトブラシ、マットの調整、オブジェクト除去（元のサイドバー項目「ロトブラシとマットを調整」「ビデオからオブジェクトを削除する」）"
+    },
+    {
+      "path": "After Effects/アニメーション",
+      "description": "キーフレーム、イージング、モーションパス、モーションブラー（元のサイドバー項目「After Effects でアニメーションを作成」）"
+    },
+    {
+      "path": "After Effects/透明と合成",
+      "description": "ブレンドモード、トラックマット、キーイング（元のサイドバー項目「透明と合成を使用した作業」）"
+    },
+    {
+      "path": "After Effects/カラー",
+      "description": "カラーコレクション、カラーマネジメント、ビット深度（元のサイドバー項目「色を調整」）"
+    },
+    {
+      "path": "After Effects/エフェクト",
+      "description": "エフェクトの適用とアニメーションプリセット（元のサイドバー項目「効果およびアニメーションプリセットを適用」）"
+    },
+    {
+      "path": "After Effects/エクスプレッションと自動化",
+      "description": "エクスプレッション、スクリプト、バッチ処理（元のサイドバー項目「式を使用する」「After Effects での自動化」）"
+    },
+    {
+      "path": "After Effects/3D",
+      "description": "3Dレイヤー、カメラ、ライト、3Dモデルの読み込み（元のサイドバー項目「3Dコンポジションで作業する」）"
+    },
+    {
+      "path": "After Effects/没入型ビデオとVR",
+      "description": "360/VR 映像の編集とエフェクト（元のサイドバー項目「没入型ビデオとVR」）"
+    },
+    {
+      "path": "After Effects/表示とプレビュー",
+      "description": "プレビュー、解像度、表示オプション（元のサイドバー項目「表示とプレビュー」）"
+    },
+    {
+      "path": "After Effects/レンダリングと書き出し",
+      "description": "レンダーキュー、Media Encoder、書き出し設定（元のサイドバー項目「レンダリングと書き出し」）"
+    },
+    {
+      "path": "After Effects/他アプリ連携",
+      "description": "Premiere Pro / Photoshop / Cinema 4D などとの連携（元のサイドバー項目「他のアプリケーションと連携する」）"
+    },
+    {
+      "path": "After Effects/パフォーマンス",
+      "description": "メモリ、ディスクキャッシュ、レンダリング速度（元のサイドバー項目「メモリ、ディスクおよびパフォーマンス」）"
+    },
+    {
+      "path": "After Effects/トラブルシューティング",
+      "description": "機能に紐づかない不具合（起動しない・クラッシュする等）。機能に紐づく不具合はその機能のセクションへ（元のサイドバー項目「トラブルシューティング」）"
+    },
+
     {
       "path": "形式",
-      "description": "記述の性質の軸。原則としてこれ自体は付けず、子ラベルで分類する"
+      "kind": "axis",
+      "description": "記述の性質の軸。サブラベル専用。原則としてこれ自体は付けず、子ラベルで分類する"
+    },
+    {
+      "path": "形式/Q&A",
+      "description": "疑問とその答えの形で書かれたもの。作業中に詰まった点の記録",
+      "aliases": ["QandA", "QA"]
     },
     {
       "path": "形式/調べ物",
@@ -63,9 +214,32 @@
       "description": "思いついたこと・検討中の構想。まだ裏は取れていない",
       "aliases": ["idea", "着想"]
     },
+
+    {
+      "path": "横断",
+      "kind": "axis",
+      "description": "アプリの機能に紐づかない横串の軸。サブラベル専用。原則としてこれ自体は付けず、子ラベルで分類する"
+    },
+    {
+      "path": "横断/ショートカット",
+      "description": "キーボードショートカットや操作の速度に関する知識",
+      "aliases": ["shortcut", "ショートカットキー"]
+    },
+    {
+      "path": "横断/バージョン差分",
+      "description": "バージョンによって場所や名称が変わった機能。「昔はあったのに見つからない」系",
+      "aliases": ["version-diff", "バージョン差"]
+    },
+    {
+      "path": "横断/非破壊ワークフロー",
+      "description": "モディファイア・調整レイヤーなど、後から戻せる形で作業を組み立てる話",
+      "aliases": ["non-destructive", "非破壊"]
+    },
+
     {
       "path": "状態",
-      "description": "情報の信頼度の軸。原則としてこれ自体は付けず、子ラベルで分類する"
+      "kind": "axis",
+      "description": "情報の信頼度の軸。サブラベル専用。原則としてこれ自体は付けず、子ラベルで分類する"
     },
     {
       "path": "状態/確定",

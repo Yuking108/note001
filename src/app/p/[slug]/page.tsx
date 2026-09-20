@@ -38,7 +38,16 @@ export default async function PageDetail({ params }: { params: Promise<Params> }
         ) : null}
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {page.labels.map((label) => (
+          {/* メインラベルは「このページの置き場」。枠線で他と区別する */}
+          <Link
+            href={labelUrl(page.mainLabel)}
+            title={`メインラベル: ${page.mainLabel}`}
+            className="rounded-full border border-border-strong px-2 py-0.5 font-mono text-[11px] text-fg hover:border-accent hover:text-accent"
+          >
+            {page.mainLabel}
+          </Link>
+
+          {page.subLabels.map((label) => (
             <Link
               key={label}
               href={labelUrl(label)}

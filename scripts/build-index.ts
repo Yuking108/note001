@@ -13,12 +13,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   buildLabelTree,
+  labelKey,
   resolveLabel,
+  resolveMainLabel,
   resolveRegistry,
   type LabelIssue,
   type ResolvedRegistry,
 } from '../src/lib/labels';
 import {
+  LABEL_COUNT_WARN_THRESHOLD,
   SCHEMA_VERSION,
   type ContentIndex,
   type IndexedPage,
@@ -223,8 +226,14 @@ function validateMeta(raw: unknown, slug: string, registry: ResolvedRegistry): I
     fail(`${where}: visibility は "private" のみです（${String(meta.visibility)}）`);
     broken = true;
   }
-  if (!Array.isArray(meta.labels)) {
-    fail(`${where}: labels は配列が必要です`);
+  if ('labels' in meta) {
+    fail(
+      `${where}: labels は廃止されました（schemaVersion 2 では mainLabel と subLabels に分けます）`,
+    );
+    broken = true;
+  }
+  if (meta.subLabels !== undefined && !Array.isArray(meta.subLabels)) {
+    fail(`${where}: subLabels は配列が必要です`);
     broken = true;
   }
   if (meta.links !== undefined && !Array.isArray(meta.links)) {
@@ -237,19 +246,40 @@ function validateMeta(raw: unknown, slug: string, registry: ResolvedRegistry): I
   if (summary.trim() === '') {
     warn(`${where}: summary が空です（一覧で中身を判断できません）`);
   }
-  const rawLabels = Array.isArray(meta.labels) ? meta.labels : [];
-  if (rawLabels.length === 0) {
-    warn(`${where}: labels が空です（ラベルが無いとこのページは一覧から見つけられません）`);
-  }
   if (DATE_PATTERN.test(createdAt) && DATE_PATTERN.test(updatedAt) && updatedAt < createdAt) {
     warn(`${where}: updatedAt が createdAt より前です`);
   }
 
-  // ラベルをレジストリの正規パスに解決する
-  const labels: string[] = [];
-  for (const rawLabel of rawLabels) {
+  // --- メインラベル: ちょうど1つ。無ければエラー（label-spec.md §7.2 の 1〜4） ---
+  let mainLabel = '';
+  if (Array.isArray(meta.mainLabel)) {
+    fail(`${where}: mainLabel は配列ではなく文字列です（メインラベルはちょうど1つ）`);
+    broken = true;
+  } else if (typeof meta.mainLabel !== 'string' || meta.mainLabel.trim() === '') {
+    fail(`${where}: mainLabel が必要です（\`<アプリ>/<セクション>\` の2段で1つだけ）`);
+    broken = true;
+  } else {
+    const resolution = resolveMainLabel(meta.mainLabel, registry);
+    if (!resolution.ok) {
+      collect(resolution.issues, `${where}: `);
+      broken = true;
+    } else {
+      if (resolution.renamedFrom !== undefined) {
+        warn(
+          `${where}: mainLabel "${resolution.renamedFrom}" を "${resolution.path}" に読み替えました（meta.json を更新してください）`,
+        );
+      }
+      mainLabel = resolution.path;
+    }
+  }
+
+  // --- サブラベル: 0件以上。メインとの重複・自身の重複はエラー（同 5〜7） ---
+  const rawSubLabels = Array.isArray(meta.subLabels) ? meta.subLabels : [];
+  const subLabels: string[] = [];
+
+  for (const rawLabel of rawSubLabels) {
     if (typeof rawLabel !== 'string') {
-      fail(`${where}: labels に文字列でない要素があります`);
+      fail(`${where}: subLabels に文字列でない要素があります`);
       broken = true;
       continue;
     }
@@ -261,19 +291,44 @@ function validateMeta(raw: unknown, slug: string, registry: ResolvedRegistry): I
     }
     if (resolution.renamedFrom !== undefined) {
       warn(
-        `${where}: ラベル "${resolution.renamedFrom}" を "${resolution.path}" に読み替えました（meta.json を更新してください）`,
+        `${where}: サブラベル "${resolution.renamedFrom}" を "${resolution.path}" に読み替えました（meta.json を更新してください）`,
       );
     }
-    if (labels.includes(resolution.path)) {
-      warn(`${where}: ラベル "${resolution.path}" が重複しています`);
+    if (mainLabel !== '' && labelKey(resolution.path) === labelKey(mainLabel)) {
+      fail(`${where}: サブラベル "${resolution.path}" がメインラベルと同じです`);
+      broken = true;
       continue;
     }
-    labels.push(resolution.path);
+    if (subLabels.some((owned) => labelKey(owned) === labelKey(resolution.path))) {
+      fail(`${where}: サブラベル "${resolution.path}" が重複しています`);
+      broken = true;
+      continue;
+    }
+    subLabels.push(resolution.path);
+  }
+
+  // 警告（同 8〜9）
+  if (subLabels.length === 0) {
+    warn(`${where}: subLabels が空です（メインラベル以外の切り口から引けません）`);
+  }
+  if (1 + subLabels.length >= LABEL_COUNT_WARN_THRESHOLD) {
+    warn(
+      `${where}: ラベルが ${1 + subLabels.length} 件あります（${LABEL_COUNT_WARN_THRESHOLD} 件以上は付けすぎの兆候）`,
+    );
   }
 
   if (broken) return null;
 
-  return { id: slug, title, summary, labels, createdAt, updatedAt };
+  return {
+    id: slug,
+    title,
+    summary,
+    mainLabel,
+    subLabels,
+    allLabels: [mainLabel, ...subLabels],
+    createdAt,
+    updatedAt,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -371,9 +426,19 @@ function main(): void {
 
   const labels = buildLabelTree(pages, registry);
 
+  // メインラベルの固定リスト（アプリ自身とその第二階層）は、先に全部登録するのが本仕様の前提。
+  // 0件でも「放置」ではないので警告には数えず、使用状況だけ最後に一行で出す（label-spec.md §7.2 の警告10）。
+  const sectionPaths = new Set<string>(registry.apps);
+  for (const sections of registry.sectionsOf.values()) {
+    for (const section of sections) sectionPaths.add(section);
+  }
+
   // 未使用ラベルは件数だけ出す。毎回全件並べると他の警告が埋もれる
   const unused = labels
-    .filter((label) => label.count === 0 && registry.descriptions.has(label.path))
+    .filter(
+      (label) =>
+        label.count === 0 && registry.descriptions.has(label.path) && !sectionPaths.has(label.path),
+    )
     .map((label) => label.path);
 
   if (unused.length > 0) {
@@ -410,6 +475,12 @@ function main(): void {
   if (errors.length === 0) {
     console.log(
       `索引を生成しました: ${pages.length} ページ / ${labels.filter((l) => l.count > 0).length} ラベル（使用中）`,
+    );
+
+    const usedSections = labels.filter((l) => sectionPaths.has(l.path) && l.mainCount > 0).length;
+    const totalSections = [...registry.sectionsOf.values()].reduce((sum, s) => sum + s.length, 0);
+    console.log(
+      `メインラベル: ${totalSections} セクション中 ${usedSections} 件を使用中（${registry.apps.join(' / ')}）`,
     );
   }
 }

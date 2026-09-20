@@ -1,35 +1,47 @@
 /**
  * ページの器を作る。使い方:
- *   npm run new -- --title "SQLite FTS5 の基本と日本語対応"
+ *   npm run new -- --title "ベベル後の編集が大変な問題" --main "Blender/モデリング"
+ *   npm run new -- -t "…" -m "Blender/モデリング" -s 形式/Q&A -s 状態/検証中
  *
  * slug は日付 + 短い ID（例 20260920-a3f2）。
  * タイトルを後から変えても URL が壊れないように、slug にタイトルを含めない。
+ *
+ * メインラベルを必須にしているのは、無いとビルドがエラーになる（label-spec.md §7.2）ため。
+ * 「どのフォルダに置くか」は書き始める前に決まっているはずなので、ここで訊く。
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { HTML_FILENAME, META_FILENAME, PAGES_DIR, today } from './paths';
-import { SCHEMA_VERSION, type PageMeta } from '../src/lib/types';
+import { HTML_FILENAME, LABELS_FILE, META_FILENAME, PAGES_DIR, today } from './paths';
+import { resolveLabel, resolveMainLabel, resolveRegistry } from '../src/lib/labels';
+import { SCHEMA_VERSION, type LabelRegistry, type PageMeta } from '../src/lib/types';
 
-function parseArgs(argv: string[]): { title: string; labels: string[] } {
+const USAGE =
+  '使い方: npm run new -- --title "ページのタイトル" --main "Blender/モデリング" [--sub 形式/Q&A ...]';
+
+function parseArgs(argv: string[]): { title: string; main: string; subs: string[] } {
   let title = '';
-  const labels: string[] = [];
+  let main = '';
+  const subs: string[] = [];
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--title' || arg === '-t') {
       title = argv[i + 1] ?? '';
       i += 1;
-    } else if (arg === '--label' || arg === '-l') {
+    } else if (arg === '--main' || arg === '-m') {
+      main = argv[i + 1] ?? '';
+      i += 1;
+    } else if (arg === '--sub' || arg === '-s') {
       const value = argv[i + 1];
-      if (value !== undefined) labels.push(value);
+      if (value !== undefined) subs.push(value);
       i += 1;
     } else if (arg !== undefined && !arg.startsWith('-') && title === '') {
       title = arg;
     }
   }
 
-  return { title: title.trim(), labels };
+  return { title: title.trim(), main: main.trim(), subs };
 }
 
 function generateSlug(): string {
@@ -190,11 +202,45 @@ function htmlTemplate(title: string): string {
 }
 
 function main(): void {
-  const { title, labels } = parseArgs(process.argv.slice(2));
+  const { title, main: rawMain, subs: rawSubs } = parseArgs(process.argv.slice(2));
 
   if (title === '') {
-    console.error('使い方: npm run new -- --title "ページのタイトル" [--label 技術/SQLite ...]');
+    console.error(USAGE);
     process.exit(1);
+  }
+
+  const registry = resolveRegistry(
+    JSON.parse(fs.readFileSync(LABELS_FILE, 'utf8')) as LabelRegistry,
+  );
+
+  if (rawMain === '') {
+    console.error(`${USAGE}\n`);
+    console.error('メインラベルは必須です（無いとビルドが通りません）。次のどれかを選んでください:');
+    printSections(registry);
+    process.exit(1);
+  }
+
+  const mainResolution = resolveMainLabel(rawMain, registry);
+  if (!mainResolution.ok) {
+    for (const issue of mainResolution.issues) console.error(`エラー ${issue.message}`);
+    console.error('\n選べるメインラベル:');
+    printSections(registry);
+    process.exit(1);
+  }
+  const mainLabel = mainResolution.path;
+
+  const subLabels: string[] = [];
+  for (const raw of rawSubs) {
+    const resolution = resolveLabel(raw, registry);
+    if (!resolution.ok) {
+      for (const issue of resolution.issues) console.error(`エラー ${issue.message}`);
+      process.exit(1);
+    }
+    if (resolution.path === mainLabel) {
+      console.error(`エラー サブラベル "${resolution.path}" がメインラベルと同じです`);
+      process.exit(1);
+    }
+    if (!subLabels.includes(resolution.path)) subLabels.push(resolution.path);
   }
 
   const slug = generateSlug();
@@ -206,7 +252,8 @@ function main(): void {
     id: slug,
     title,
     summary: '',
-    labels,
+    mainLabel,
+    subLabels,
     createdAt: date,
     updatedAt: date,
     visibility: 'private',
@@ -221,9 +268,21 @@ function main(): void {
   const relative = path.relative(process.cwd(), dir);
   console.log(`作成しました: ${relative}/`);
   console.log(`  ${HTML_FILENAME}  本文をここに書く`);
-  console.log(`  ${META_FILENAME}  summary と labels を埋める`);
-  if (labels.length === 0) {
-    console.log('\n次: content/labels.json を見てラベル候補を 3〜7 件に絞り、本人の確認を取る。');
+  console.log(`  ${META_FILENAME}  summary を埋める`);
+  console.log(`\nメインラベル: ${mainLabel}`);
+  console.log(`サブラベル:   ${subLabels.length > 0 ? subLabels.join(' / ') : '（なし）'}`);
+  if (subLabels.length === 0) {
+    console.log('\n次: content/labels.json を見てサブラベル候補を 3〜7 件に絞り、本人の確認を取る。');
+  }
+}
+
+/** メインラベルに使える固定リストを、アプリごとに並べて見せる */
+function printSections(registry: ReturnType<typeof resolveRegistry>): void {
+  for (const app of registry.apps) {
+    console.error(`\n  [${app}]`);
+    for (const section of registry.sectionsOf.get(app) ?? []) {
+      console.error(`    ${section}`);
+    }
   }
 }
 
