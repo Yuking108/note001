@@ -8,6 +8,12 @@
       "aliases": ["blender3d"]
     },
     {
+      "path": "Blender/Q&A",
+      "section": false,
+      "description": "疑問とその答えの形で書かれた Blender のページ。作業中に詰まった点の記録。公式ドキュメントのセクションではないのでメインラベルにはできない（サブラベル専用）",
+      "aliases": ["QandA", "QA"]
+    },
+    {
       "path": "Blender/ユーザーインターフェース",
       "description": "ウィンドウ・エリア・パネル・操作系など、Blender の UI そのものの仕組み（公式 User Interface）",
       "aliases": ["User Interface"]

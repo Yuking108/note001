@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ボックス選択で囲んでも選択されない</title>
+    <style>
+      /* ------------------------------------------------------------------
+         アクセントはメインラベル（Blender/モデリング）の色。
+         原因が7つあり「上から順に」が答えなので、順序のある診断リストにする。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #9c5f06;
+        --accent-ink: #7a4a05;
+        --accent-bg: #f7ecd8;
+        --accent-line: #dcbe86;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #e9a94a;
+          --accent-ink: #f2c07a;
+          --accent-bg: #2e2415;
+          --accent-line: #5b4520;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.75rem, 1.3rem + 2.1vw, 2.6rem);
+        line-height: 1.32;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+      .question .detail {
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        color: var(--ink-2);
+      }
+
+      section {
+        margin-top: 3.75rem;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .kbd {
+        font-family: var(--font-mono);
+        font-size: 0.84em;
+        font-weight: 600;
+        padding: 0.12em 0.45em;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      /* --- 診断リスト --------------------------------------------------- */
+      /* 「上から順に」が答えなので、番号は飾りではなく確認の順番そのもの */
+
+      ol.causes {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: cause;
+        margin: 1.5rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      ol.causes > li {
+        counter-increment: cause;
+        display: grid;
+        grid-template-columns: 2rem 1fr;
+        gap: 1rem;
+        padding: 1rem 1.15rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+      }
+      ol.causes > li::before {
+        content: counter(cause);
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        color: var(--ink-3);
+        text-align: center;
+        padding-top: 0.15em;
+      }
+      ol.causes > li.top {
+        background: var(--accent-bg);
+        border-color: var(--accent-line);
+      }
+      ol.causes > li.top::before {
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .cause-name {
+        display: block;
+        font-weight: 700;
+        line-height: 1.6;
+      }
+      ol.causes > li.top .cause-name {
+        color: var(--accent-ink);
+      }
+      .cause-body {
+        margin: 0.35rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        line-height: 1.75;
+        color: var(--ink-2);
+      }
+      .cause-body strong {
+        color: var(--ink);
+      }
+      .most {
+        display: inline-block;
+        font-family: var(--font-mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.1em;
+        color: var(--accent-ink);
+        border: 1px solid var(--accent-line);
+        padding: 0.05rem 0.45rem;
+        margin-left: 0.5rem;
+        vertical-align: 0.15em;
+        white-space: nowrap;
+      }
+      .cause-body ul {
+        list-style: none;
+        margin: 0.5rem 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .cause-body ul li {
+        position: relative;
+        padding-left: 1rem;
+        font-size: 0.9rem;
+      }
+      .cause-body ul li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.8em;
+        width: 5px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+
+      .shortcut {
+        max-width: var(--measure);
+        margin: 1.75rem 0;
+        padding: 1.3rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .shortcut .label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .shortcut .head {
+        font-family: var(--font-display);
+        font-size: 1.12rem;
+        line-height: 1.65;
+        letter-spacing: 0.01em;
+      }
+      .shortcut p {
+        margin: 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--ink-2);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+        ol.causes > li {
+          grid-template-columns: 1.5rem 1fr;
+          gap: 0.75rem;
+          padding: 0.9rem 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Modeling</span
+          ><span class="dot"></span> <span>Selection</span><span class="dot"></span>
+          <span>2026.09.18</span>
+        </div>
+        <h1>ボックス選択で囲んでも選択されない</h1>
+        <p class="standfirst">
+          原因は7つある。ツールを切り替えた直後なら、まず疑うのはモードが「減算」になっていること。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>ボックス選択で囲んでいるのに選択にならない</p>
+        <p class="detail">
+          ボックス選択ツールでドラッグして範囲を囲んでいるのに、何も選択されない。透過モードにしても奥側が選択されない。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Answer</span>原因は複数ある。上から順にチェックする</h2>
+
+        <ol class="causes">
+          <li class="top">
+            <div>
+              <span class="cause-name"
+                >ツール設定のモードが「減算」になっている<span class="most">最多</span></span
+              >
+              <p class="cause-body">
+                ボックス選択ツールを選ぶと画面上部のツール設定バーに小さなアイコンが4つ並ぶ（設定 /
+                拡張 / 減算 / 差分 /
+                交差）。ここが「減算（Subtract）」だと、囲っても選択が解除されるだけで何も選ばれない。<strong>一番左の「設定（Set）」</strong>に戻す。ツール切り替え直後に一番多い原因。
+              </p>
+            </div>
+          </li>
+
+          <li>
+            <div>
+              <span class="cause-name">透過（X-Ray）がオンになっていない</span>
+              <p class="cause-body">
+                編集モードでは、デフォルトだと手前から見えている頂点しか選択されない。<span
+                  class="kbd"
+                  >Alt</span
+                >+<span class="kbd">Z</span> で透過をオン。
+              </p>
+              <div class="cause-body">
+                <ul>
+                  <li>
+                    <span class="kbd">Shift</span>+<span class="kbd">Z</span>（ワイヤーフレーム切り替え）と押し間違えやすい
+                  </li>
+                  <li>
+                    ビューポート右上の「重なった2つの四角」アイコンが青くハイライトされていれば有効
+                  </li>
+                  <li>
+                    シェーディングのプルダウンで X-Ray スライダーが 1.0 だと、見た目は不透明のまま
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <div>
+              <span class="cause-name">面選択モードになっている</span>
+              <p class="cause-body">
+                面は<strong>中心の点</strong>が範囲内に入らないと選択されない。<span class="kbd"
+                  >1</span
+                >
+                で頂点選択モードに切り替えて試すと分かりやすい。
+              </p>
+            </div>
+          </li>
+
+          <li>
+            <div>
+              <span class="cause-name">裏側が別オブジェクトになっている</span>
+              <p class="cause-body">
+                編集モードは今編集中のオブジェクトにしか効かない。複数同時に編集するなら、オブジェクトモードで全部選択してから
+                <span class="kbd">Tab</span>。
+              </p>
+            </div>
+          </li>
+
+          <li>
+            <div>
+              <span class="cause-name">非表示の頂点がある</span>
+              <p class="cause-body">
+                過去に <span class="kbd">H</span> で隠した部分は選択対象外。<span class="kbd"
+                  >Alt</span
+                >+<span class="kbd">H</span> で全表示に戻る。
+              </p>
+            </div>
+          </li>
+
+          <li>
+            <div>
+              <span class="cause-name">モディファイア由来の形状</span>
+              <p class="cause-body">
+                ミラーやサブディビジョンで画面に見えているだけの形状は<strong>実体がないので選択できない</strong>。必要なら「適用」する。
+              </p>
+            </div>
+          </li>
+
+          <li>
+            <div>
+              <span class="cause-name">アウトライナー側の設定</span>
+              <div class="cause-body">
+                <ul>
+                  <li>選択可能（矢印アイコン）がオフ → フィルター（じょうごアイコン）から有効化</li>
+                  <li>目のアイコンがオフ / コレクションのチェックが外れている</li>
+                </ul>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Shortcut</span>切り分けの近道</h2>
+        <div class="shortcut">
+          <span class="label">まず <span class="kbd">A</span> を押す</span>
+          <span class="head">全選択して、裏側も含めて全部オレンジになるか見る。</span>
+          <p>
+            なるなら<strong>ジオメトリは存在している</strong>ので透過設定の問題。ならない部分があれば、別オブジェクトか非表示か、モディファイア由来の形状。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

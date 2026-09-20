@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>流体シミュレーションが動かない（キャッシュタイプとベイクの工程）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         アクセントはメインラベル（Blender/物理演算）の色。題材が液体なので青。
+         原因が「工程の押し忘れ」なので、工程そのものを図にして欠けた位置を示す。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #2b5ea8;
+        --accent-ink: #224b87;
+        --accent-bg: #e3ebf7;
+        --accent-line: #a8c0e2;
+
+        --miss: #a8402c;
+        --miss-bg: #f8e7e3;
+        --miss-line: #e0b3a8;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #7fa9e8;
+          --accent-ink: #a0c1f0;
+          --accent-bg: #18222f;
+          --accent-line: #33486b;
+
+          --miss: #e08a72;
+          --miss-bg: #2f1c17;
+          --miss-line: #5c332a;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.7rem, 1.25rem + 2vw, 2.45rem);
+        line-height: 1.34;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .env {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--ink-3);
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+
+      section {
+        margin-top: 3.75rem;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+      h3 {
+        font-family: var(--font-body);
+        font-weight: 700;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        letter-spacing: 0.04em;
+        color: var(--ink-2);
+        margin: 2.5rem 0 0.9rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line-soft);
+      }
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .kbd {
+        font-family: var(--font-mono);
+        font-size: 0.84em;
+        font-weight: 600;
+        padding: 0.12em 0.45em;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      .verdict {
+        margin: 1.75rem 0;
+        padding: 1.4rem 1.6rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        color: var(--accent-ink);
+        font-family: var(--font-display);
+        font-size: 1.14rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+      }
+      .verdict p {
+        margin: 0;
+        max-width: none;
+      }
+      .verdict p + p {
+        margin-top: 0.6rem;
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+      }
+
+      /* --- ベイクの工程 ------------------------------------------------ */
+      /* 飛ばした工程がどこかを一目で分かるようにするのがこの図の役目 */
+
+      ol.pipeline {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: bake;
+        margin: 1.5rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      ol.pipeline > li {
+        counter-increment: bake;
+        display: grid;
+        grid-template-columns: 2.2rem 1fr;
+        gap: 1rem;
+        align-items: center;
+        padding: 0.85rem 1rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+      }
+      ol.pipeline > li::before {
+        content: counter(bake);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--ink-3);
+        text-align: center;
+      }
+      ol.pipeline > li.missed {
+        background: var(--miss-bg);
+        border-color: var(--miss-line);
+      }
+      ol.pipeline > li.missed::before {
+        color: var(--miss);
+        font-weight: 700;
+      }
+      .pipeline .name {
+        font-weight: 700;
+      }
+      .pipeline .what {
+        display: block;
+        font-size: 0.88rem;
+        font-weight: 400;
+        color: var(--ink-2);
+      }
+      .pipeline .missed .name {
+        color: var(--miss);
+      }
+      .pipeline .mark {
+        display: inline-block;
+        margin-left: 0.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.1em;
+        color: var(--miss);
+        border: 1px solid var(--miss-line);
+        padding: 0.05rem 0.45rem;
+        vertical-align: 0.1em;
+        white-space: nowrap;
+      }
+
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+        margin: 1.5rem 0;
+      }
+      table {
+        width: 100%;
+        min-width: 30rem;
+        border-collapse: collapse;
+        font-size: 0.93rem;
+      }
+      thead th {
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        text-align: left;
+        padding: 0 1rem 0.6rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      tbody td {
+        padding: 0.85rem 1rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      tbody th {
+        text-align: left;
+        font-weight: 700;
+        padding: 0.85rem 1.25rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      tr.pick th,
+      tr.pick td {
+        background: var(--accent-bg);
+      }
+      tr.pick th {
+        box-shadow: inset 3px 0 0 var(--accent);
+        padding-left: 1rem;
+      }
+      td .verdict-no {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+        color: var(--ink-3);
+        white-space: nowrap;
+      }
+
+      .rules {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .rules li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.5rem;
+        padding: 0.7rem 1rem;
+        background: var(--surface-2);
+        border-left: 2px solid var(--accent);
+      }
+      .rules .when {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        min-width: 7rem;
+      }
+      .rules .then {
+        font-weight: 700;
+      }
+
+      ol.checklist {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: chk;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      ol.checklist > li {
+        counter-increment: chk;
+        display: grid;
+        grid-template-columns: 2rem 1fr;
+        gap: 0.9rem;
+        padding: 0.8rem 0;
+        border-top: 1px solid var(--line-soft);
+        line-height: 1.7;
+      }
+      ol.checklist > li:last-child {
+        border-bottom: 1px solid var(--line-soft);
+      }
+      ol.checklist > li::before {
+        content: counter(chk);
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--ink-3);
+        padding-top: 0.25em;
+      }
+      ol.checklist > li.cause {
+        background: var(--miss-bg);
+        margin: 0 -0.75rem;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+      }
+      ol.checklist > li.cause::before {
+        color: var(--miss);
+        font-weight: 700;
+      }
+
+      .lesson {
+        max-width: var(--measure);
+        margin: 1.5rem 0;
+        padding: 1.3rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+      .lesson .head {
+        font-family: var(--font-display);
+        font-size: 1.1rem;
+        line-height: 1.6;
+        letter-spacing: 0.01em;
+        color: var(--ink);
+      }
+      .lesson p {
+        margin: 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--ink-2);
+      }
+
+      .note-missing {
+        max-width: var(--measure);
+        margin: 1.25rem 0;
+        padding: 0.9rem 1.2rem;
+        border: 1px dashed var(--line);
+        font-size: 0.85rem;
+        color: var(--ink-3);
+      }
+
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+        .rules .when {
+          min-width: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Physics</span
+          ><span class="dot"></span> <span>Fluid</span><span class="dot"></span>
+          <span>2026.09.19</span>
+        </div>
+        <h1>流体シミュレーションが動かない</h1>
+        <p class="standfirst">
+          シミュレーションも設定もファイルも、最初から壊れていなかった。押していないボタンが1つあっただけ。
+        </p>
+        <p class="env">
+          環境: Blender 5.2 LTS / 参考動画 3.6.3 / ドメインの箱に Sphere（流入口）とボトル
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>流体シミュレーションが、再生しても出ない／ベイクしても出ない</p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Answer</span>ベイクの工程を1つ飛ばしていた</h2>
+
+        <div class="verdict">
+          <p>
+            モジュラーでは「データをベイク」と「メッシュをベイク」が別のボタン。「データをベイク」だけ押して止まっていた。
+          </p>
+          <p>
+            その状態だと流体の計算自体は終わっているのに<strong>水面のメッシュが生成されないので、画面には何も出ない</strong>。エラーも警告も出ない。
+          </p>
+        </div>
+
+        <p>
+          決め手になった観察は<strong>「モジュラーだと出ないが、リプレイだと出る」</strong>。リプレイは全工程が自動で走るので出る。この差がすべてを説明した。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Root cause</span>キャッシュタイプの違い</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">タイプ</th>
+                <th scope="col">挙動</th>
+                <th scope="col">使いどころ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">リプレイ</th>
+                <td>再生すると<strong>全工程が自動で走る</strong></td>
+                <td>作業中・確認用。最終レンダリングには非推奨</td>
+              </tr>
+              <tr>
+                <th scope="row">モジュラー</th>
+                <td>工程ごとに<strong>手動でベイク</strong>。ボタンが分かれている</td>
+                <td>工程ごとに調整したいとき</td>
+              </tr>
+              <tr class="pick">
+                <th scope="row">全て</th>
+                <td><strong>1ボタンで全工程を一括ベイク</strong></td>
+                <td>最終レンダリング前はこれが安全</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>モジュラーで押す順番</h3>
+        <ol class="pipeline">
+          <li>
+            <span class="name">データをベイク<span class="what">流体の基本計算</span></span>
+          </li>
+          <li class="missed">
+            <span class="name"
+              >メッシュをベイク<span class="mark">ここを忘れる</span>
+              <span class="what">水面のポリゴン生成。これが無いと画面に何も出ない</span></span
+            >
+          </li>
+          <li>
+            <span class="name"
+              >ノイズをベイク / パーティクルをベイク<span class="what">必要に応じて</span></span
+            >
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Rules</span>運用ルール</h2>
+        <p>これだけ守れば再発しない。</p>
+        <ul class="rules">
+          <li><span class="when">作業中・確認</span><span class="then">リプレイ</span></li>
+          <li>
+            <span class="when">レンダリング前</span><span class="then">「全て」でベイク</span>
+          </li>
+          <li>
+            <span class="when">迷ったら</span
+            ><span class="then">モジュラーを使わない</span
+            ><span>（押し忘れが起きる）</span>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Dead ends</span>遠回りの記録</h2>
+        <p>結論に至るまでに疑って<strong>外れた</strong>もの。同じ沼に入らないために残す。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">疑ったこと</th>
+                <th scope="col">結果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">表面からの発生距離が 0 → 1.5 に変更</th>
+                <td>
+                  液体は出たが、<strong>値そのものが原因とは限らない</strong>。設定変更でキャッシュが無効化され再計算が走ったのが効いた可能性が高い。0
+                  は発生範囲が実質ゼロなので 1.5 に戻すこと自体は正しい
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">
+                  <span class="kbd">Shift</span>+<span class="kbd">←</span> で1フレーム目に戻す
+                </th>
+                <td>
+                  <strong>リプレイで古いキャッシュが残っているときには実際に有効</strong>。公式バグ
+                  #75850 の回避策としても挙げられている
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">キャッシュのパス / 日本語パス / iCloud 同期 / ディスク容量</th>
+                <td><span class="verdict-no">今回は無関係</span></td>
+              </tr>
+              <tr>
+                <th scope="row">公式バグ #72860 / #85403 / #73770</th>
+                <td>
+                  <span class="verdict-no">いずれも該当せず</span>（#73770 は Windows 専用・修正済み）
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">ドメインタイプが「ガス」のまま / スケール未適用 / 解像度不足</th>
+                <td><span class="verdict-no">該当せず</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Checklist</span>出ないときのチェックリスト</h2>
+        <ol class="checklist">
+          <li class="cause">
+            <span
+              ><strong>ベイクのボタンが他にもないか見る</strong>（モジュラーなら「メッシュをベイク」）— 今回の原因</span
+            >
+          </li>
+          <li><span>キャッシュタイプを「全て」にして一括ベイクしてみる</span></li>
+          <li>
+            <span
+              ><span class="kbd">Shift</span>+<span class="kbd">←</span>
+              で1フレーム目に戻して再読み込みさせる（リプレイのキャッシュが古いとき）</span
+            >
+          </li>
+          <li><span>ドメインのドメインタイプが「液体」か（初期値は「ガス」）</span></li>
+          <li>
+            <span
+              >フロータイプが「液体」／フローの挙動が「流入口」か（フロータイプの初期値も「煙」）</span
+            >
+          </li>
+          <li><span>フローの「表面からの発生距離」が 0 になっていないか（通常 1.5）</span></li>
+          <li>
+            <span
+              >ドメインのスケールを適用したか（<span class="kbd">Ctrl</span>+<span class="kbd"
+                >A</span
+              >
+              &gt; スケール）</span
+            >
+          </li>
+          <li><span>解像度（Resolution Divisions）。初期値 32 では小さい流入口を拾えない</span></li>
+          <li>
+            <span
+              >切り分け：<strong>新規ファイルで「クイック液体」が動くか</strong>。動けば Blender
+              は正常、ファイル側の問題</span
+            >
+          </li>
+        </ol>
+
+        <div class="note-missing">
+          原文にあったスクリーンショット4点（講座の見た目 / 自分の見た目 / Sphere
+          の設定）は未取り込み。Sphere 側は「フロータイプ＝液体／フローの挙動＝流入口／フローを使用
+          ON」で正しかった。
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Lessons</span>教訓</h2>
+
+        <div class="lesson">
+          <span class="head">「ベイクしたのに出ない」ときは、まずベイクのボタンが他にもないか見る。</span>
+          <p>
+            設定や環境（パス・同期・ディスク・バグ）を疑う前に、<strong>工程の押し忘れ</strong>を疑う。今回は環境側を延々と調べたが、答えは押していないボタンが1つあっただけだった。
+          </p>
+        </div>
+
+        <div class="lesson">
+          <span class="head">「A だと動くが B だと動かない」という差が見つかったら、それが最短の手がかり。</span>
+          <p>今回もリプレイとモジュラーの差に気づいた瞬間に解決した。</p>
+        </div>
+      </section>
+
+    </main>
+  </body>
+</html>

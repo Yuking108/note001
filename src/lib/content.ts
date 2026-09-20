@@ -21,6 +21,24 @@ export function findLabel(path: string): IndexedLabel | undefined {
   return allLabels.find((label) => labelKey(label.path) === key);
 }
 
+/**
+ * 関連ページ。自分が挙げた先（links）と、自分を挙げているページ（被リンク）の両方を返す。
+ * 片側にだけ書けば両方のページに出るので、関連は片方向に書けば足りる。
+ */
+export function relatedPages(id: string): IndexedPage[] {
+  const page = findPage(id);
+  if (page === undefined) return [];
+
+  const ids = new Set(page.links);
+  for (const other of allPages) {
+    if (other.id !== id && other.links.includes(id)) ids.add(other.id);
+  }
+
+  return [...ids]
+    .map((linked) => findPage(linked))
+    .filter((linked): linked is IndexedPage => linked !== undefined);
+}
+
 /** 本文の配信先。trailingSlash の影響を受けないよう末尾はファイル名で終える */
 export function pageHtmlUrl(id: string): string {
   return `/pages/${id}/index.html`;

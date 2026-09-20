@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>マテリアルのバンプ設定（最新バージョン）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         アクセントはメインラベル（Blender/レンダリング）の色。
+         ノードの繋ぎ方が中心なので、ノードエディタの見た目をそのまま持ち込む。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #62479f;
+        --accent-ink: #4e3880;
+        --accent-bg: #ece7f6;
+        --accent-line: #c2b3e0;
+
+        --danger: #a8402c;
+        --danger-bg: #f8e7e3;
+        --danger-line: #e0b3a8;
+
+        /* ノードのソケット色は Blender の配色に合わせる */
+        --socket-color: #c7c729;
+        --socket-vector: #6363c7;
+        --socket-shader: #63c763;
+        --node-head: #4a4a52;
+        --node-body: #303036;
+        --node-text: #e8e8ec;
+        --noodle: #9a9aa6;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #a996e0;
+          --accent-ink: #c0b1ee;
+          --accent-bg: #221c33;
+          --accent-line: #453a63;
+
+          --danger: #e08a72;
+          --danger-bg: #2f1c17;
+          --danger-line: #5c332a;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.75rem, 1.3rem + 2.1vw, 2.6rem);
+        line-height: 1.32;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+      .question .detail {
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        color: var(--ink-2);
+      }
+
+      section {
+        margin-top: 3.75rem;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+      h3 {
+        font-family: var(--font-body);
+        font-weight: 700;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        letter-spacing: 0.04em;
+        color: var(--ink-2);
+        margin: 2.5rem 0 0.9rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line-soft);
+      }
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .kbd {
+        font-family: var(--font-mono);
+        font-size: 0.84em;
+        font-weight: 600;
+        padding: 0.12em 0.45em;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      /* --- ノードグラフ ------------------------------------------------ */
+      /* 「どの出力をどの入力に繋ぐか」が要点なので、ソケット名まで描く */
+
+      .graph {
+        overflow-x: auto;
+        max-width: 100%;
+        margin: 1.5rem 0;
+        padding: 1.4rem 1.2rem;
+        background: var(--surface-2);
+        border: 1px solid var(--line-soft);
+      }
+      .graph-rail {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        min-width: max-content;
+      }
+      .node {
+        width: 11.5rem;
+        background: var(--node-body);
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+        flex: none;
+      }
+      .node .head {
+        background: var(--node-head);
+        color: var(--node-text);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        padding: 0.4rem 0.6rem;
+      }
+      .node .socket {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.28rem 0.6rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--node-text);
+      }
+      .node .socket.out {
+        justify-content: flex-end;
+      }
+      .node .socket .pin {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.5);
+        flex: none;
+      }
+      .pin.color {
+        background: var(--socket-color);
+      }
+      .pin.vector {
+        background: var(--socket-vector);
+      }
+      .pin.shader {
+        background: var(--socket-shader);
+      }
+      .node .socket.dim {
+        opacity: 0.45;
+      }
+      .node .pad {
+        height: 0.35rem;
+      }
+
+      .noodle {
+        flex: none;
+        width: 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--noodle);
+      }
+      .noodle svg {
+        display: block;
+        width: 3rem;
+        height: 1.5rem;
+      }
+
+      .graph-caption {
+        margin: 0.75rem 0 0;
+        max-width: none;
+        font-size: 0.85rem;
+        color: var(--ink-3);
+      }
+
+      /* --- 注意点 ------------------------------------------------------ */
+
+      ol.gotchas {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: g;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      ol.gotchas > li {
+        counter-increment: g;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.gotchas > li::before {
+        content: counter(g);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+      .most-common {
+        display: inline-block;
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.1em;
+        color: var(--danger);
+        background: var(--danger-bg);
+        border: 1px solid var(--danger-line);
+        padding: 0.05rem 0.45rem;
+        margin-left: 0.35rem;
+        white-space: nowrap;
+      }
+
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+        margin: 1.5rem 0;
+      }
+      table {
+        width: 100%;
+        min-width: 28rem;
+        border-collapse: collapse;
+        font-size: 0.93rem;
+      }
+      thead th {
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        text-align: left;
+        padding: 0 1rem 0.6rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      tbody td {
+        padding: 0.85rem 1rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      tbody th {
+        text-align: left;
+        font-weight: 700;
+        padding: 0.85rem 1.25rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      tbody th small {
+        display: block;
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+        color: var(--ink-3);
+      }
+
+      .values {
+        max-width: var(--measure);
+        margin: 1.25rem 0;
+        padding: 1rem 1.25rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        line-height: 2;
+        color: var(--ink-2);
+        overflow-x: auto;
+      }
+      .values b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+
+      .callout {
+        max-width: var(--measure);
+        margin: 1.75rem 0;
+        padding: 1.15rem 1.35rem;
+        background: var(--surface-2);
+        border: 1px solid var(--line-soft);
+        border-left: 2px solid var(--accent);
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .callout .label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .callout p {
+        margin: 0;
+        max-width: none;
+      }
+
+      .version {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.5rem;
+        margin: 1.25rem 0;
+        padding: 0.9rem 1.25rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--ink-2);
+      }
+      .version b {
+        color: var(--ink);
+      }
+
+      footer {
+        margin-top: 4rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--line);
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Rendering</span
+          ><span class="dot"></span> <span>Shader Nodes</span><span class="dot"></span>
+          <span>2026.09.18</span>
+        </div>
+        <h1>マテリアルのバンプ設定</h1>
+        <p class="standfirst">
+          仕組みは 2.8 系から変わっていない。古い動画と違って見えるのは、4.0 で「ノーマル」入力の置き場所が移ったから。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>マテリアルのバンプは最新バージョンだと何に設定したらいい？</p>
+        <p class="detail">
+          古いチュートリアル通りに進めると項目が見つからない。現行バージョンでのバンプの組み方を知りたい。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Answer</span>仕組みは変わっていない。UI の場所が変わっただけ</h2>
+
+        <div class="version">
+          <span>現行リリース <b>5.2 LTS</b></span>
+          <span>5.3 は <b>2026-11-10 予定・未リリース</b>（アルファ版は入手可）</span>
+          <span>バンプ関連ノードは <b>2.8 系〜5.x で互換</b></span>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Node graph</span>標準的なノード構成</h2>
+
+        <div class="graph">
+          <div class="graph-rail">
+            <div class="node">
+              <div class="head">画像テクスチャ</div>
+              <div class="socket out">カラー<span class="pin color"></span></div>
+              <div class="socket out dim">アルファ<span class="pin color"></span></div>
+              <div class="pad"></div>
+            </div>
+
+            <div class="noodle">
+              <svg viewBox="0 0 48 24" aria-hidden="true">
+                <path
+                  d="M0 12C12 12 12 12 24 12s12 0 24 0"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path d="M40 7l8 5-8 5z" fill="currentColor" />
+              </svg>
+            </div>
+
+            <div class="node">
+              <div class="head">バンプ</div>
+              <div class="socket out">ノーマル<span class="pin vector"></span></div>
+              <div class="pad"></div>
+              <div class="socket"><span class="pin color"></span>強さ</div>
+              <div class="socket"><span class="pin color"></span>距離</div>
+              <div class="socket"><span class="pin color"></span>高さ</div>
+              <div class="socket dim"><span class="pin vector"></span>ノーマル</div>
+              <div class="pad"></div>
+            </div>
+
+            <div class="noodle">
+              <svg viewBox="0 0 48 24" aria-hidden="true">
+                <path
+                  d="M0 12C12 12 12 12 24 12s12 0 24 0"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path d="M40 7l8 5-8 5z" fill="currentColor" />
+              </svg>
+            </div>
+
+            <div class="node">
+              <div class="head">プリンシプル BSDF</div>
+              <div class="socket out">BSDF<span class="pin shader"></span></div>
+              <div class="pad"></div>
+              <div class="socket dim"><span class="pin color"></span>ベースカラー</div>
+              <div class="socket dim"><span class="pin color"></span>粗さ</div>
+              <div class="socket"><span class="pin vector"></span>ノーマル</div>
+              <div class="pad"></div>
+            </div>
+          </div>
+          <p class="graph-caption">
+            カラー → バンプの「高さ」、バンプの「ノーマル」→ BSDF の「ノーマル」。
+          </p>
+        </div>
+
+        <h3>押さえるポイント</h3>
+        <ol class="gotchas">
+          <li>
+            <span>
+              画像テクスチャの<strong>カラースペースを「非カラー（Non-Color）」に変更する</strong>
+              <span class="most-common">最多の失敗</span><br />
+              sRGB のままにしてしまうケース。
+            </span>
+          </li>
+          <li>
+            <span>
+              繋ぐ先はバンプノードの<strong>「高さ」</strong>。「ノーマル」入力ではない
+            </span>
+          </li>
+          <li>
+            <span>
+              <strong>4.0 以降、プリンシプル BSDF の「ノーマル」は一番下の「ジオメトリ」パネルの中にある</strong>。古い動画では一覧に並んでいるので見失いやすい
+            </span>
+          </li>
+        </ol>
+
+        <h3>バンプノードの値</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">目安</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">強さ<small>Strength</small></th>
+                <td>0〜1。デフォルト 1 は強すぎることが多いので 0.1〜0.5 から</td>
+              </tr>
+              <tr>
+                <th scope="row">距離<small>Distance</small></th>
+                <td>凹凸の高さ（シーン単位）。メートル単位なら 0.01〜0.05 が現実的</td>
+              </tr>
+              <tr>
+                <th scope="row">反転<small>Invert</small></th>
+                <td>凹凸が逆に見えるときにオン</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>ノーマルマップ画像の場合</h3>
+        <p>
+          <code class="ui">_normal</code>
+          のような紫っぽい画像はバンプではなく<strong>ノーマルマップ</strong>ノードを使う（カラースペースは同じく非カラー）。両方使うなら、ノーマルマップノードの出力をバンプノードの<strong>「ノーマル」入力</strong>に繋いで直列にする。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Material properties</span>「ディスプレイスメント」の設定</h2>
+        <p>
+          マテリアルプロパティ &gt; 設定 &gt; サーフェス &gt; ディスプレイスメント
+          は、デフォルトの<strong>「バンプのみ」</strong>のままで OK。
+        </p>
+        <div class="callout">
+          <span class="label">実際に変形させたいとき</span>
+          <p>
+            「ディスプレイスメントとバンプ」に変更し、Cycles +
+            アダプティブサブディビジョンが必要。<strong>EEVEE では効かない</strong>。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Procedural</span>ノイズで作るバンプ</h2>
+        <p>画像を使わずにノイズで凹凸を作るパターン。5.x でもそのまま作れる。</p>
+
+        <div class="graph">
+          <div class="graph-rail">
+            <div class="node">
+              <div class="head">ノイズテクスチャ</div>
+              <div class="socket out">係数<span class="pin color"></span></div>
+              <div class="socket out dim">カラー<span class="pin color"></span></div>
+              <div class="pad"></div>
+            </div>
+
+            <div class="noodle">
+              <svg viewBox="0 0 48 24" aria-hidden="true">
+                <path
+                  d="M0 12C12 12 12 12 24 12s12 0 24 0"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path d="M40 7l8 5-8 5z" fill="currentColor" />
+              </svg>
+            </div>
+
+            <div class="node">
+              <div class="head">カラーランプ</div>
+              <div class="socket out">カラー<span class="pin color"></span></div>
+              <div class="pad"></div>
+              <div class="socket"><span class="pin color"></span>係数</div>
+              <div class="pad"></div>
+            </div>
+
+            <div class="noodle">
+              <svg viewBox="0 0 48 24" aria-hidden="true">
+                <path
+                  d="M0 12C12 12 12 12 24 12s12 0 24 0"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path d="M40 7l8 5-8 5z" fill="currentColor" />
+              </svg>
+            </div>
+
+            <div class="node">
+              <div class="head">バンプ</div>
+              <div class="socket out">ノーマル<span class="pin vector"></span></div>
+              <div class="pad"></div>
+              <div class="socket"><span class="pin color"></span>高さ</div>
+              <div class="pad"></div>
+            </div>
+
+            <div class="noodle">
+              <svg viewBox="0 0 48 24" aria-hidden="true">
+                <path
+                  d="M0 12C12 12 12 12 24 12s12 0 24 0"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path d="M40 7l8 5-8 5z" fill="currentColor" />
+              </svg>
+            </div>
+
+            <div class="node">
+              <div class="head">プリンシプル BSDF</div>
+              <div class="socket out">BSDF<span class="pin shader"></span></div>
+              <div class="pad"></div>
+              <div class="socket"><span class="pin vector"></span>ノーマル</div>
+              <div class="pad"></div>
+            </div>
+          </div>
+          <p class="graph-caption">BSDF の「ノーマル」は 4.0 以降ジオメトリパネルの中。</p>
+        </div>
+
+        <h3>ノードの追加方法</h3>
+        <p><span class="kbd">Shift</span>+<span class="kbd">A</span> から:</p>
+        <ul class="ticks">
+          <li>テクスチャ &gt; <strong>ノイズテクスチャ</strong></li>
+          <li>コンバーター &gt; <strong>カラーランプ</strong></li>
+          <li>ベクトル &gt; <strong>バンプ</strong></li>
+        </ul>
+
+        <h3>参考値</h3>
+        <div class="values">
+          ノイズテクスチャ&nbsp;&nbsp;3D / スケール <b>105</b> / 細かさ <b>5.8</b> / 粗さ
+          <b>0.816</b> / 歪み <b>0</b><br />
+          バンプ&nbsp;&nbsp;強さ <b>0.329</b> / 距離 <b>1.0</b>
+        </div>
+
+        <h3>4.1 以降でノイズテクスチャに増えた項目</h3>
+        <p>古いチュートリアルのスクショと見た目が違う理由。</p>
+        <ul class="ticks">
+          <li>
+            <strong>タイプ</strong>のプルダウンが追加（fBM がデフォルト。他に Multifractal /
+            Ridged Multifractal / Hybrid Multifractal / Hetero Terrain）
+          </li>
+          <li><strong>ラクナリティ</strong>入力が追加（デフォルト 2.0）</li>
+          <li><strong>正規化</strong>チェックボックスが追加（デフォルト ON）</li>
+        </ul>
+        <p>
+          スケール / 細かさ / 粗さ /
+          歪みはそのまま残っているので、<strong>追加項目はデフォルトのまま</strong>で上記の値を入れれば同じ結果になる。
+        </p>
+
+        <h3>カラーランプの役割</h3>
+        <p>
+          ノイズの濃淡（コントラスト）を調整して凹凸の出方をコントロールする。黒と白のハンドルを内側に寄せるほど凹凸がくっきりする。バンプの強さだけで調整するより狙った質感にしやすい。
+        </p>
+
+        <div class="callout">
+          <span class="label">補足</span>
+          <p>
+            ノイズの「カラー」出力をカラーランプの「係数」に繋ぐ形でも動く（グレースケールに変換される）。ノイズの「係数」出力を使うほうがより一般的。
+          </p>
+        </div>
+      </section>
+
+      <footer>バージョン確認: 2026-09 時点</footer>
+    </main>
+  </body>
+</html>

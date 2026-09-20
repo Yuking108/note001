@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-1cqq",
+  "title": "ボックス選択で囲んでも選択されない",
+  "summary": "原因は7つ。ツール切り替え直後に一番多いのはツール設定のモードが「減算」のまま。次に X-Ray 未使用、面選択モードの中心点判定。A を押して全選択できるかで切り分けられる。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/Q&A"
+  ],
+  "createdAt": "2026-09-18",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_ボックス選択で囲んでも選択されない.md をページ化したもの"
+  }
+}

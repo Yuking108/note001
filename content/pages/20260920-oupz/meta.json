@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-oupz",
+  "title": "カーソルに白い丸が付いてくる",
+  "summary": "正体はサークル選択ツール。W で選択ツールを切り替えれば戻る。3Dカーソル・ブラシ半径・プロポーショナル編集と紛らわしいが、マウスに追従するかと現在のモードで判別できる。",
+  "mainLabel": "Blender/エディター",
+  "subLabels": [
+    "Blender/Q&A"
+  ],
+  "createdAt": "2026-09-18",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [
+    "20260920-1cqq"
+  ],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_カーソルに白い丸が付いてくる.md をページ化したもの"
+  }
+}

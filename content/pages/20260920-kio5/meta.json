@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-kio5",
+  "title": "コンポジターに「ノードの使用」チェックが見つからない",
+  "summary": "5.0 でノードツリーが独立したデータブロックになり、「ノードを使用」は削除された。代わりにヘッダーの「新規」を押す。最終出力もコンポジットノードからグループ出力に変わっている。",
+  "mainLabel": "Blender/コンポジティング",
+  "subLabels": [
+    "Blender/Q&A"
+  ],
+  "createdAt": "2026-09-15",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [
+    "20260920-m2u9"
+  ],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_コンポジターにノードの使用がない.md をページ化したもの"
+  }
+}

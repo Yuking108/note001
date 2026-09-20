@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ベベル後に辺を動かすのが大変な問題</title>
+    <style>
+      /* ------------------------------------------------------------------
+         アクセントはメインラベル（Blender/モデリング）の色＝ベベルウェイトの琥珀。
+         同じモデリングのページは同じ色になる。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #9c5f06;
+        --accent-ink: #7a4a05;
+        --accent-bg: #f7ecd8;
+        --accent-line: #dcbe86;
+
+        --danger: #a8402c;
+        --danger-bg: #f8e7e3;
+        --danger-line: #e0b3a8;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+        --cut: 13px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #e9a94a;
+          --accent-ink: #f2c07a;
+          --accent-bg: #2e2415;
+          --accent-line: #5b4520;
+
+          --danger: #e08a72;
+          --danger-bg: #2f1c17;
+          --danger-line: #5c332a;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.75rem, 1.3rem + 2.1vw, 2.6rem);
+        line-height: 1.32;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        clip-path: polygon(
+          0 0,
+          calc(100% - var(--cut)) 0,
+          100% var(--cut),
+          100% 100%,
+          var(--cut) 100%,
+          0 calc(100% - var(--cut))
+        );
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+
+      section {
+        margin-top: 3.75rem;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+      h3 {
+        font-family: var(--font-body);
+        font-weight: 700;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        letter-spacing: 0.04em;
+        color: var(--ink-2);
+        margin: 2.5rem 0 0.9rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line-soft);
+      }
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .kbd {
+        font-family: var(--font-mono);
+        font-size: 0.84em;
+        font-weight: 600;
+        padding: 0.12em 0.45em;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+        margin: 1.5rem 0;
+      }
+      table {
+        width: 100%;
+        min-width: 28rem;
+        border-collapse: collapse;
+        font-size: 0.93rem;
+      }
+      thead th {
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        text-align: left;
+        padding: 0 1rem 0.6rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      tbody td {
+        padding: 0.85rem 1rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      tbody th {
+        text-align: left;
+        font-weight: 700;
+        padding: 0.85rem 1.25rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      tbody th small {
+        display: block;
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+        color: var(--ink-3);
+      }
+      tr.pick th,
+      tr.pick td {
+        background: var(--accent-bg);
+      }
+      tr.pick th {
+        box-shadow: inset 3px 0 0 var(--accent);
+        padding-left: 1rem;
+      }
+
+      /* この記事の中心。原則は本文と分けて置く */
+      .principle {
+        margin: 1.75rem 0;
+        padding: 1.4rem 1.6rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        color: var(--accent-ink);
+        font-family: var(--font-display);
+        font-size: 1.14rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        clip-path: polygon(
+          0 0,
+          calc(100% - var(--cut)) 0,
+          100% var(--cut),
+          100% 100%,
+          var(--cut) 100%,
+          0 calc(100% - var(--cut))
+        );
+      }
+      .principle p {
+        margin: 0;
+        max-width: none;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+
+      .callout {
+        max-width: var(--measure);
+        margin: 1.75rem 0;
+        padding: 1.15rem 1.35rem;
+        background: var(--surface-2);
+        border: 1px solid var(--line-soft);
+        border-left: 2px solid var(--danger);
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .callout .label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--danger);
+      }
+      .callout p {
+        margin: 0;
+        max-width: none;
+      }
+
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Modeling</span
+          ><span class="dot"></span> <span>Bevel</span><span class="dot"></span>
+          <span>2026.09.15</span>
+        </div>
+        <h1>ベベル後に辺を動かすのが大変な問題</h1>
+        <p class="standfirst">
+          辺が増えて扱いにくいのは操作の下手さではなく、順番の問題。ベベルを最後に回せば、動かす辺は常に1本で済む。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>
+          ベベルをかけた後に辺を動かすと、ベベルの段数だけ動かさないといけなくて厄介。どうしている？
+        </p>
+      </div>
+
+      <section>
+        <h2>
+          <span class="lead">Answer</span
+          >編集中は「ベベルモディファイア」で持ち、メッシュ自体にはベベルをかけない
+        </h2>
+        <p>
+          <span class="kbd">Ctrl</span>+<span class="kbd">B</span>
+          の<strong>ベベルツールは破壊的</strong>で、1本の辺が実体のある2〜数本の辺に増える。以後の編集で毎回その束を扱うことになるので、当然やりにくくなる。
+        </p>
+        <p>ハードサーフェス系のモデリングでは原則がはっきりしている。</p>
+
+        <div class="principle">
+          <p>ベベルは最後の仕上げ。編集する形はローポリの「ケージ」のまま保つ。</p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Setup</span>非破壊ベベルの基本セット</h2>
+        <ol class="steps">
+          <li><span>角を落とさない、素の形（クリーンな四角面）でモデリングする</span></li>
+          <li><span><strong>ベベルモディファイア</strong>を追加</span></li>
+          <li>
+            <span
+              ><span class="ui">Shade Auto Smooth</span>（Smooth by
+              Angle）をモディファイアの最後にかける</span
+            >
+          </li>
+          <li>
+            <span
+              >必要なら<strong>ウェイテッドノーマル</strong>モディファイア、またはベベルモディファイアの
+              <span class="ui">Harden Normals</span> で陰影を整える</span
+            >
+          </li>
+        </ol>
+        <p>
+          これで辺を動かすときは常に1本の辺を動かすだけになり、ベベルは自動で追従する。段数や幅も後からいつでも変えられる。
+        </p>
+
+        <h3>「どの辺にベベルをかけるか」の制御</h3>
+        <p>ベベルモディファイアの<strong>制限方法（Limit Method）</strong>で切り替える。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">制限方法</th>
+                <th scope="col">使いどころ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">角度<small>Angle</small></th>
+                <td>一括でざっくり。まずはこれ</td>
+              </tr>
+              <tr class="pick">
+                <th scope="row">ウェイト<small>Weight</small></th>
+                <td>辺ごとにベベルウェイトを指定。狙った辺だけ落とせる</td>
+              </tr>
+              <tr>
+                <th scope="row">頂点グループ<small>Vertex Group</small></th>
+                <td>領域単位で制御したいとき</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          辺ごとに指定する場合は、編集モードで辺を選んで <span class="kbd">Ctrl</span>+<span
+            class="kbd"
+            >E</span
+          >
+          → <span class="ui">ベベルウェイト</span>（または N パネルの辺データ）で値を 1 にする。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Recovery</span>すでに破壊的ベベルをかけてしまった場合</h2>
+        <ul class="ticks">
+          <li>直後なら <span class="kbd">Ctrl</span>+<span class="kbd">Z</span></li>
+          <li>
+            進んでしまった場合：ベベルで増えた辺ループを
+            <span class="kbd">Alt</span>+クリックで全部選択 → <span class="kbd">M</span> →
+            <strong>距離でマージ</strong>（Merge by Distance）で1本に潰せる
+          </li>
+          <li>
+            または選択して <span class="kbd">X</span> →
+            <strong>辺を溶解</strong>（Dissolve Edges）
+          </li>
+        </ul>
+
+        <div class="callout">
+          <span class="label">注意</span>
+          <p>
+            辺を溶解は<strong>面の構成が崩れることがある</strong>ので、マージのほうが安全。戻したら、その辺にベベルウェイトを付けてベベルモディファイアに任せる。
+          </p>
+        </div>
+
+        <h3>それでも破壊的ベベルを扱うときの選択テクニック</h3>
+        <ul class="ticks">
+          <li>
+            ベベルの帯をまとめて選ぶ：ループを1本 <span class="kbd">Alt</span>+クリック →
+            <span class="kbd">Ctrl</span>+<span class="kbd">テンキー＋</span> で選択範囲を拡大
+          </li>
+          <li>
+            類似選択（<span class="kbd">Shift</span>+<span class="kbd">G</span>）で同じ方向・長さの辺をまとめて拾う
+          </li>
+          <li>
+            移動は<strong>辺スライド</strong>（<span class="kbd">G</span><span class="kbd">G</span>）やプロポーショナル編集を使うと帯のまま素直に動く
+          </li>
+        </ul>
+
+        <h3>破壊的ベベルを「あえて」使う場面</h3>
+        <p>
+          スカルプトやゲーム書き出しなど、最終的にメッシュを確定させる必要があるとき。→
+          <strong>作業の最後にモディファイアを適用</strong>する。もしくは適用前のオブジェクトを複製してバックアップに残す。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Summary</span>まとめ</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">状態</th>
+                <th scope="col">方針</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">形を触っている最中</th>
+                <td>ベベルモディファイアで非破壊。メッシュはローポリのまま</td>
+              </tr>
+              <tr>
+                <th scope="row">角の出方を調整したい</th>
+                <td>制限方法をウェイトにして辺ごとに指定</td>
+              </tr>
+              <tr>
+                <th scope="row">書き出し・スカルプト直前</th>
+                <td>そこで初めて適用（バックアップを残す）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </body>
+</html>

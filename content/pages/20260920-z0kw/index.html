@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>スムーズシェードをかけるタイミング</title>
+    <style>
+      /* ------------------------------------------------------------------
+         アクセントはメインラベル（Blender/モデリング）の色。
+         答えが「縛りはない、ただし1つだけ例外」なので、例外だけを際立たせる。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #9c5f06;
+        --accent-ink: #7a4a05;
+        --accent-bg: #f7ecd8;
+        --accent-line: #dcbe86;
+
+        --wrong: #a8402c;
+        --wrong-bg: #f8e7e3;
+        --wrong-line: #e0b3a8;
+        --right: #2b7350;
+        --right-bg: #e2f0e8;
+        --right-line: #a7cdb9;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #e9a94a;
+          --accent-ink: #f2c07a;
+          --accent-bg: #2e2415;
+          --accent-line: #5b4520;
+
+          --wrong: #e08a72;
+          --wrong-bg: #2f1c17;
+          --wrong-line: #5c332a;
+          --right: #6ec79b;
+          --right-bg: #15291f;
+          --right-line: #2f5540;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.75rem, 1.3rem + 2.1vw, 2.6rem);
+        line-height: 1.32;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+      .question .detail {
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        color: var(--ink-2);
+      }
+
+      section {
+        margin-top: 3.75rem;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      /* 答えそのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.75rem 0;
+        padding: 1.6rem 1.75rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-family: var(--font-display);
+        font-size: clamp(1.3rem, 1.1rem + 1vw, 1.7rem);
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      /* --- 唯一の順序の縛り -------------------------------------------- */
+      /* 「かける時期は自由／スタック内の位置だけは自由でない」の対比が要点 */
+
+      .orders {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+      .order {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        padding: 1rem 1.1rem 1.2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      .order.bad {
+        border-color: var(--wrong-line);
+        background: var(--wrong-bg);
+      }
+      .order.good {
+        border-color: var(--right-line);
+        background: var(--right-bg);
+      }
+      .order .verdict-label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .order.bad .verdict-label {
+        color: var(--wrong);
+      }
+      .order.good .verdict-label {
+        color: var(--right);
+      }
+      .order ol {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+      .order li {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        padding: 0.35rem 0.6rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        color: var(--ink-2);
+      }
+      .order li.smooth {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .order .why {
+        margin: 0;
+        max-width: none;
+        font-size: 0.86rem;
+        line-height: 1.7;
+        color: var(--ink-2);
+      }
+
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+        margin: 1.5rem 0;
+      }
+      table {
+        width: 100%;
+        min-width: 26rem;
+        border-collapse: collapse;
+        font-size: 0.93rem;
+      }
+      thead th {
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        text-align: left;
+        padding: 0 1rem 0.6rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      tbody td {
+        padding: 0.85rem 1rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      tbody th {
+        text-align: left;
+        font-weight: 700;
+        padding: 0.85rem 1.25rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Modeling</span
+          ><span class="dot"></span> <span>Shading</span><span class="dot"></span>
+          <span>2026.09.15</span>
+        </div>
+        <h1>スムーズシェードをかけるタイミング</h1>
+        <p class="standfirst">
+          形は変わらないので、かける時期に縛りはない。縛られるのは「いつ」ではなく、モディファイアスタックの「どこ」。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>スムーズシェードをかけるタイミングは？ 最後（完成後）でもいい？</p>
+        <p class="detail">
+          解説動画では制作の途中でかけていることが多いが、決まったタイミングがあるのか、いつでもいいのかが分からない。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Answer</span>いつでもいい。最後にかけて問題ない</h2>
+
+        <div class="verdict">
+          <span class="big">スムーズシェードは形状を一切変えない「見た目の設定」。</span>
+          <p>面ごとに「滑らかに表示する」フラグを立てているだけ。</p>
+        </div>
+
+        <ul class="ticks">
+          <li>ジオメトリは変化しない</li>
+          <li>何度でも切り替えられる（Shade Flat で戻せる）</li>
+          <li>後からかけても結果は同じ</li>
+        </ul>
+        <p>
+          つまり「この工程の前にやらないと壊れる」という順序の縛りはない。完成後にまとめてかけるのが一番シンプル。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>なぜ動画では途中でかけているのか</h2>
+        <p>
+          <strong>形のチェックのため。</strong>
+          フラットシェードだと面の境目が全部見えてしまい、面の流れの歪みや潰れが分かりにくい。スムーズにすると、
+        </p>
+        <ul class="ticks">
+          <li>陰影のムラ</li>
+          <li>ピンチ（つまみ）やヨレ</li>
+          <li>シルエットの気持ち悪さ</li>
+        </ul>
+        <p>
+          が一気に見えるようになる。だから「モデリング中の検品ツール」として早めにかけている。<strong>順序のルールではなく、作業のしやすさの話</strong>。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Practice</span>実務的なおすすめ運用</h2>
+        <ol class="steps">
+          <li>
+            <span
+              >モデリング中：早めにスムーズシェードをかけて、形の確認用にそのまま進める</span
+            >
+          </li>
+          <li>
+            <span
+              >途中で押し出し・分割して面を足すと、周囲の設定を引き継ぐのでフラットとスムーズが混ざることがある</span
+            >
+          </li>
+          <li>
+            <span
+              >完成後：オブジェクト全体を選択して <span class="ui">Shade Auto Smooth</span>
+              をかけ直し、角を立てたい辺だけ調整する</span
+            >
+          </li>
+        </ol>
+        <p>これなら「途中で確認」と「最後に整える」を両立できる。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">One caveat</span>1つだけ順序に注意する点（4.1 以降）</h2>
+        <p>
+          4.1
+          以降、以前の「自動スムーズ」はオブジェクトデータの項目ではなく<strong>Smooth by
+          Angle（角度によるスムーズ）というジオメトリノードのモディファイア</strong>として追加される（右クリック
+          → シェードのオートスムーズ）。
+        </p>
+        <p>
+          つまり<strong>スタックの中の位置が意味を持つ</strong>。早い段階でオートスムーズをかけ、その後にベベルやサブディビジョンを追加すると、スムーズ処理がそれらより前に来てしまう。
+        </p>
+
+        <div class="orders">
+          <div class="order bad">
+            <span class="verdict-label">意図した角にならない</span>
+            <ol>
+              <li class="smooth">スムーズ by アングル</li>
+              <li>ベベル</li>
+              <li>サブディビジョン</li>
+            </ol>
+            <p class="why">後から足したモディファイアがスムーズ処理より後ろに来ている。</p>
+          </div>
+          <div class="order good">
+            <span class="verdict-label">これが基本</span>
+            <ol>
+              <li>ベベル</li>
+              <li>サブディビジョン</li>
+              <li class="smooth">スムーズ by アングル</li>
+            </ol>
+            <p class="why">スタックの一番下。組み終わってからかける、または後からドラッグで移す。</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Summary</span>まとめ</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">目的</th>
+                <th scope="col">タイミング</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">形のチェック</th>
+                <td>早め（いつでも、何度でも）</td>
+              </tr>
+              <tr>
+                <th scope="row">最終的な見た目の確定</th>
+                <td>完成後にまとめて</td>
+              </tr>
+              <tr>
+                <th scope="row">オートスムーズ / Smooth by Angle</th>
+                <td>モディファイアを組み終わった最後</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

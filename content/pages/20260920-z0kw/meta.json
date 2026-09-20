@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-z0kw",
+  "title": "スムーズシェードをかけるタイミング",
+  "summary": "形状を変えない見た目の設定なので、かける時期に縛りはない。縛られるのは 4.1 以降の Smooth by Angle がモディファイアになったこと — スタックの最後に置く必要がある。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/レンダリング"
+  ],
+  "createdAt": "2026-09-15",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_スムーズシェードをかけるタイミング.md をページ化したもの"
+  }
+}

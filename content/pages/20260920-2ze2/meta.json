@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-2ze2",
+  "title": "ボトルと中身（液体）がある複雑な形でのベベル運用",
+  "summary": "モディファイアはオブジェクト単位なので、まずボトルと中身を別オブジェクトにする。ボトルはプロファイル＋スクリューで非破壊に持ち、液体はガラスの内壁を複製して微妙にめり込ませる。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/モデリング/ベベル"
+  ],
+  "createdAt": "2026-09-15",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [
+    "20260920-nxa4",
+    "20260920-z0kw"
+  ],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_ボトルと中身（液体）のベベル運用.md をページ化したもの"
+  }
+}

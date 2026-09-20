@@ -80,7 +80,19 @@ const CSP = [
 
 const HEAD_INJECTION = `
     <meta http-equiv="Content-Security-Policy" content="${CSP}" />
-    <meta name="robots" content="noindex, nofollow" />`;
+    <meta name="robots" content="noindex, nofollow" />
+    <style>
+      /* 親が iframe の高さを本文に合わせるので、本文側のスクロールバーには出番がない。
+         溝が残っていると「埋め込まれている」継ぎ目として見えてしまうため隠す。
+         overflow は既定のままなので、高さ通知が届かなかった場合もホイールで読める。 */
+      html {
+        scrollbar-width: none;
+      }
+      html::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+      }
+    </style>`;
 
 /**
  * 本文の高さを親に通知する。iframe は opaque origin なので親から高さを読めない。
@@ -90,25 +102,42 @@ const HEIGHT_NOTIFIER = `
     <script>
       (function () {
         var last = -1;
-        function send() {
+        function send(force) {
           var height = Math.ceil(document.documentElement.scrollHeight);
-          if (height === last) return;
+          if (!force && height === last) return;
           last = height;
           parent.postMessage({ type: 'note001:height', height: height }, '*');
         }
+        // 親（React）がリスナーを張るのは iframe の読み込みより後になりうる。
+        // 高さは変化したときしか送らないので、黙っていると初回の1通が捨てられて
+        // 親が初期値のまま固定される。親からの測定要求には必ず答えて取りこぼしを防ぐ。
+        window.addEventListener('message', function (event) {
+          var data = event.data;
+          if (data && data.type === 'note001:measure') send(true);
+        });
         if (typeof ResizeObserver === 'function') {
-          new ResizeObserver(send).observe(document.documentElement);
+          new ResizeObserver(function () {
+            send(false);
+          }).observe(document.documentElement);
         }
-        document.addEventListener('DOMContentLoaded', send);
-        window.addEventListener('load', send);
+        document.addEventListener('DOMContentLoaded', function () {
+          send(false);
+        });
+        window.addEventListener('load', function () {
+          send(false);
+        });
         // 遅延読み込みされる図やフォントで高さが変わる分を拾う
         [100, 400, 1200, 3000].forEach(function (delay) {
-          setTimeout(send, delay);
+          setTimeout(function () {
+            send(false);
+          }, delay);
         });
         if (document.fonts && document.fonts.ready) {
-          document.fonts.ready.then(send);
+          document.fonts.ready.then(function () {
+            send(false);
+          });
         }
-        send();
+        send(false);
       })();
     </script>`;
 
@@ -317,6 +346,21 @@ function validateMeta(raw: unknown, slug: string, registry: ResolvedRegistry): I
     );
   }
 
+  // --- 関連ページ。存在確認は全ページを読み終えてから行う（下の main 内） ---
+  const links: string[] = [];
+  for (const rawLink of Array.isArray(meta.links) ? meta.links : []) {
+    if (typeof rawLink !== 'string') {
+      fail(`${where}: links に文字列でない要素があります`);
+      broken = true;
+      continue;
+    }
+    if (rawLink === slug) {
+      warn(`${where}: links が自分自身を指しています`);
+      continue;
+    }
+    if (!links.includes(rawLink)) links.push(rawLink);
+  }
+
   if (broken) return null;
 
   return {
@@ -326,6 +370,7 @@ function validateMeta(raw: unknown, slug: string, registry: ResolvedRegistry): I
     mainLabel,
     subLabels,
     allLabels: [mainLabel, ...subLabels],
+    links,
     createdAt,
     updatedAt,
   };
@@ -419,6 +464,17 @@ function main(): void {
 
     const page = validateMeta(raw, slug, registry);
     if (page !== null && htmlOk) pages.push(page);
+  }
+
+  // 関連ページの参照先が実在するかを確かめる。
+  // 壊れたリンクは一覧に出ないので、気づかないまま放置されやすい
+  const knownIds = new Set(pages.map((page) => page.id));
+  for (const page of pages) {
+    for (const link of page.links) {
+      if (!knownIds.has(link)) {
+        fail(`${page.id}/${META_FILENAME}: links の "${link}" に対応するページがありません`);
+      }
+    }
   }
 
   // 更新日の新しい順。同日なら slug の降順で安定させる

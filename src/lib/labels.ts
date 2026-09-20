@@ -150,6 +150,8 @@ export type ResolvedRegistry = {
   apps: string[];
   /** アプリ -> そのアプリ配下の2段ラベル（メインラベルの固定リスト）。登録順 */
   sectionsOf: Map<string, string[]>;
+  /** アプリ直下だがセクションではないラベル。サブラベル専用 */
+  nonSections: Set<string>;
   issues: LabelIssue[];
 };
 
@@ -162,6 +164,8 @@ export function resolveRegistry(registry: LabelRegistry): ResolvedRegistry {
   const resolve = new Map<string, string>();
   const descriptions = new Map<string, string>();
   const kinds = new Map<string, LabelKind>();
+  /** アプリ直下だがセクションではないラベル（サブラベル専用） */
+  const nonSections = new Set<string>();
   const paths: string[] = [];
   const issues: LabelIssue[] = [];
 
@@ -196,6 +200,17 @@ export function resolveRegistry(registry: LabelRegistry): ResolvedRegistry {
         });
       } else {
         kinds.set(path, definition.kind);
+      }
+    }
+
+    if (definition.section === false) {
+      if (labelDepth(path) !== MAIN_LABEL_SEGMENTS) {
+        issues.push({
+          level: 'error',
+          message: `section: false は第二階層にだけ指定できます（それ以外は元からメインラベルになれません）: ${path}`,
+        });
+      } else {
+        nonSections.add(path);
       }
     }
 
@@ -242,6 +257,9 @@ export function resolveRegistry(registry: LabelRegistry): ResolvedRegistry {
 
   for (const path of paths) {
     if (labelDepth(path) !== MAIN_LABEL_SEGMENTS) continue;
+    // section: false のラベル（Blender/Q&A など）はアプリの下に住むがセクションではない。
+    // 固定リストから外すことで、メインラベルとしては選べなくなる
+    if (nonSections.has(path)) continue;
     const parent = labelParent(path);
     if (parent === null) continue;
     const app = appKeys.get(labelKey(parent));
@@ -258,7 +276,7 @@ export function resolveRegistry(registry: LabelRegistry): ResolvedRegistry {
     }
   }
 
-  return { resolve, descriptions, kinds, paths, apps, sectionsOf, issues };
+  return { resolve, descriptions, kinds, paths, apps, sectionsOf, nonSections, issues };
 }
 
 export type LabelResolution =
@@ -344,9 +362,10 @@ export function resolveMainLabel(raw: string, registry: ResolvedRegistry): Label
       issues: [
         {
           level: 'error',
-          message:
-            `メインラベル "${path}" は "${app}" の固定リストにありません` +
-            `（docs/label-spec.md の一覧から選んでください）`,
+          message: registry.nonSections.has(path)
+            ? `"${path}" はセクションではないのでメインラベルにできません（サブラベル専用）`
+            : `メインラベル "${path}" は "${app}" の固定リストにありません` +
+              `（docs/label-spec.md の一覧から選んでください）`,
         },
       ],
     };

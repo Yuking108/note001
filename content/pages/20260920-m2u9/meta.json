@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-m2u9",
+  "title": "ワールドで「正距円筒図」が選べない",
+  "summary": "選べる投影方式はテクスチャノードごとに決まっている。正距円筒図を持つのは環境テクスチャだけで、画像テクスチャにはフラット／ボックス／球／チューブしかない。",
+  "mainLabel": "Blender/レンダリング",
+  "subLabels": [
+    "Blender/Q&A"
+  ],
+  "createdAt": "2026-09-14",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_ワールドで正距円筒図が選べない.md をページ化したもの"
+  }
+}

@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>コンポジターに「ノードの使用」チェックが見つからない</title>
+    <style>
+      /* ------------------------------------------------------------------
+         アクセントはメインラベル（Blender/コンポジティング）の色。
+         旧版と現行版の差分が本題なので、対応関係そのものを構造にする。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #2b7350;
+        --accent-ink: #215a3e;
+        --accent-bg: #e2f0e8;
+        --accent-line: #a7cdb9;
+
+        --old: #8a8f96;
+        --old-bg: #f0f1f3;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #6ec79b;
+          --accent-ink: #92dab5;
+          --accent-bg: #15291f;
+          --accent-line: #2f5540;
+
+          --old: #6b727a;
+          --old-bg: #1e2226;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.7rem, 1.25rem + 2vw, 2.45rem);
+        line-height: 1.34;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+
+      section {
+        margin-top: 3.75rem;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+      h3 {
+        font-family: var(--font-body);
+        font-weight: 700;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        letter-spacing: 0.04em;
+        color: var(--ink-2);
+        margin: 2.5rem 0 0.9rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line-soft);
+      }
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .kbd {
+        font-family: var(--font-mono);
+        font-size: 0.84em;
+        font-weight: 600;
+        padding: 0.12em 0.45em;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+
+      /* --- 旧 → 新 の対応表 ------------------------------------------- */
+      /* 「昔の言葉で探している」のが原因なので、旧側は消し線で無効だと示す */
+
+      .changes {
+        list-style: none;
+        margin: 1.5rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .change {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1fr);
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        padding: 0.85rem 1rem;
+      }
+      .change .from {
+        color: var(--old);
+        text-decoration: line-through;
+        text-decoration-thickness: 1px;
+        font-size: 0.92rem;
+        line-height: 1.6;
+      }
+      .change .arrow {
+        justify-self: center;
+        color: var(--ink-3);
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+      }
+      .change .to {
+        color: var(--ink);
+        font-weight: 700;
+        font-size: 0.92rem;
+        line-height: 1.6;
+      }
+      .change .to code,
+      .change .from code {
+        font-family: var(--font-mono);
+        font-size: 0.85em;
+        font-weight: 400;
+      }
+      .changes-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1fr);
+        gap: 0.5rem;
+        padding: 0 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .changes-head span:last-child {
+        color: var(--accent);
+      }
+
+      .callout {
+        max-width: var(--measure);
+        margin: 1.75rem 0;
+        padding: 1.15rem 1.35rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .callout .label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent-ink);
+      }
+      .callout p {
+        margin: 0;
+        max-width: none;
+        color: var(--accent-ink);
+      }
+      .callout strong {
+        color: var(--accent-ink);
+      }
+
+      .neutral-callout {
+        max-width: var(--measure);
+        margin: 1.75rem 0;
+        padding: 1.15rem 1.35rem;
+        background: var(--surface-2);
+        border: 1px solid var(--line-soft);
+        border-left: 2px solid var(--ink-3);
+      }
+      .neutral-callout .label {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.45rem;
+      }
+      .neutral-callout p {
+        margin: 0;
+        max-width: none;
+      }
+
+      .sources {
+        margin-top: 4rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--line);
+      }
+      .sources .label {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.75rem;
+      }
+      .sources ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      .sources li {
+        font-size: 0.88rem;
+        line-height: 1.6;
+        color: var(--ink-2);
+      }
+      .sources .url {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        color: var(--ink-3);
+        overflow-wrap: anywhere;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+        /* 狭い画面では横並びの対応が潰れるので縦に積む */
+        .change,
+        .changes-head {
+          grid-template-columns: 1fr;
+        }
+        .change .arrow {
+          justify-self: start;
+        }
+        .changes-head span:nth-child(2) {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Compositing</span
+          ><span class="dot"></span> <span>5.0</span><span class="dot"></span>
+          <span>2026.09.15</span>
+        </div>
+        <h1>コンポジターに「ノードの使用」が見つからない</h1>
+        <p class="standfirst">
+          チェックボックスは 5.0 で削除された。ノードツリーが独立したデータブロックになり、有効化はマテリアルと同じ「新規」ボタンに変わっている。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>
+          解説に「コンポジットで『ノードの使用』にチェックを入れる」と書いてあるが、そんなボタンがない
+        </p>
+      </div>
+
+      <section>
+        <h2>
+          <span class="lead">Answer</span>5.0 で削除された。代わりにヘッダーの「新規」を押す
+        </h2>
+        <p>
+          5.0 でコンポジットのノードツリーが<strong>独立したデータブロック</strong>になり、マテリアルと同じ扱いに変わった。そのため有効化の操作もマテリアルと同じ形式になっている。
+        </p>
+
+        <h3>5.0 以降の手順</h3>
+        <ol class="steps">
+          <li>
+            <span>コンポジットワークスペース（またはエディタタイプを「コンポジター」）を開く</span>
+          </li>
+          <li>
+            <span
+              ><strong>ヘッダーの「新規（New）」ボタン</strong>を押す →
+              ノードツリーが作られてシーンに割り当てられる</span
+            >
+          </li>
+          <li><span>ノードを組む</span></li>
+        </ol>
+        <p>これが旧バージョンの「ノードの使用にチェック」に相当する操作。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Migration</span>5.0 でのその他の変更点</h2>
+
+        <div class="changes-head">
+          <span>旧（4.x 以前）</span><span></span><span>新（5.0 以降）</span>
+        </div>
+        <ul class="changes">
+          <li class="change">
+            <span class="from">ヘッダーの「ノードを使用」チェック</span>
+            <span class="arrow">→</span>
+            <span class="to">ヘッダーの「新規」ボタン</span>
+          </li>
+          <li class="change">
+            <span class="from">コンポジットノード（最終出力）</span>
+            <span class="arrow">→</span>
+            <span class="to">グループ出力ノード</span>
+          </li>
+          <li class="change">
+            <span class="from">シーンに1つのノードツリー</span>
+            <span class="arrow">→</span>
+            <span class="to"
+              >データブロックとして複数持てる・他の blend ファイルでも再利用できる</span
+            >
+          </li>
+          <li class="change">
+            <span class="from"><code>scene.node_tree</code></span>
+            <span class="arrow">→</span>
+            <span class="to"><code>scene.compositing_node_group</code></span>
+          </li>
+        </ul>
+
+        <p>
+          「コンポジットノードが見つからない」という混乱も同じ原因。最終出力は<strong>グループ出力</strong>につなぐ。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">If on 4.x</span>4.x 以前を使っているのに見つからない場合</h2>
+        <p>チェックボックス自体は存在するので、以下を確認する。</p>
+        <ul class="ticks">
+          <li>
+            <strong>エディタタイプが「コンポジター」になっていない</strong>（シェーダーエディタを見ている）。左上のエディタタイプで切り替える
+          </li>
+          <li>
+            <strong>ヘッダーが狭くて項目が隠れている</strong>。ヘッダー上で中ボタンドラッグ（またはホイール）すると横にスクロールして出てくる
+          </li>
+          <li>バージョン確認：ヘルプ → Blender について</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Follow-up</span>「新規」を押すと自動的に反映されるのか？</h2>
+        <p>
+          <strong>反映される。</strong> 別途チェックを入れる操作は不要。押すとノードツリーが作られて<strong>そのシーンに割り当てられる</strong>。以降、F12
+          レンダリングと出力画像はこのノードツリーを通った結果になる。旧バージョンの「ノードを使用」にチェック＝有効化、という2段階が1つのボタンにまとまった形。
+        </p>
+
+        <div class="neutral-callout">
+          <span class="label">ただし「何も変わらない」ように見える</span>
+          <p>
+            押した直後は <strong>レンダーレイヤー → グループ出力</strong>
+            が素通しで繋がっているだけなので、見た目は一切変わらない。間にノード（グレアやカラーバランスなど）を挟んで初めて効果が出る。
+          </p>
+        </div>
+
+        <h3>本当のオン / オフスイッチはここ</h3>
+        <div class="callout">
+          <span class="label">レンダープロパティ → 後処理 → コンポジティング</span>
+          <p>
+            既定でオンなので普段は触らないが、<strong>「ノードを組んだのにレンダリングに反映されない」ときはここを確認する</strong>。逆に、ノードツリーを残したまま一時的に切りたいときもここをオフにする。
+          </p>
+        </div>
+
+        <h3>ビューポートに反映させたいとき</h3>
+        <p>
+          F12 のレンダリング結果には自動で乗るが、3D
+          ビューポートのプレビューに出すかは別設定。3D ビューポート右上の<strong>シェーディングのポップオーバー</strong>（下向き矢印）→
+          <span class="ui">コンポジター</span> を「常時」または「カメラ内」にする。既定は「無効」。
+        </p>
+
+        <h3>効果を切り分けたいとき</h3>
+        <ul class="ticks">
+          <li>
+            個別のノードを一時的に無効化：ノードを選んで <span class="kbd">M</span>（ミュート）
+          </li>
+          <li>
+            ノードツリーごと外す：ヘッダーのデータブロック名の横の <span class="kbd">X</span>
+            でリンクを解除
+          </li>
+        </ul>
+      </section>
+
+      <section class="sources">
+        <span class="label">出典</span>
+        <ul>
+          <li>
+            Blender 5.0 リリースノート コンポジター（blender.jp）
+            <span class="url">https://www.blender.jp/releasenotes/5_0/compositor</span>
+          </li>
+          <li>
+            Blender 5.0 Compositor リリースノート
+            <span class="url"
+              >https://developer.blender.org/docs/release_notes/5.0/compositor/</span
+            >
+          </li>
+          <li>
+            Changes in node tree creation for compositor in Blender 5.0
+            <span class="url"
+              >https://b3d.interplanety.org/en/changes-in-node-tree-creation-for-compositor-in-blender-5-0/</span
+            >
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

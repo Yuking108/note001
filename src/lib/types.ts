@@ -63,6 +63,13 @@ export type LabelDefinition = {
   description: string;
   /** 第一階層のみ指定する */
   kind?: LabelKind;
+  /**
+   * アプリ直下の2段ラベルを、メインラベルの固定リストに**入れない**ための印。
+   * 既定は true（公式ドキュメントのセクション）。
+   * `Blender/Q&A` のように「アプリの下に置くがセクションではない」ラベルにだけ false を付ける。
+   * false のラベルはサブラベル専用になる。
+   */
+  section?: boolean;
   /** 表記ゆれの受け皿 */
   aliases?: string[];
 };
@@ -87,6 +94,8 @@ export type IndexedPage = {
    * ラベルツリーの実装はメイン / サブの区別を意識しないまま動く。
    */
   allLabels: string[];
+  /** このページが挙げている関連ページの id。存在しない id はビルドで弾く */
+  links: string[];
   createdAt: string;
   updatedAt: string;
 };

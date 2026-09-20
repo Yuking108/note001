@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ワールドで「正距円筒図」が選べない</title>
+    <style>
+      /* ------------------------------------------------------------------
+         アクセントはメインラベル（Blender/レンダリング）の色。
+         答えが「ノードを間違えている」なので、2つのノードを並べて持ち物を比べる。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #62479f;
+        --accent-ink: #4e3880;
+        --accent-bg: #ece7f6;
+        --accent-line: #c2b3e0;
+
+        --absent: #8a8f96;
+
+        /* ノードの配色は Blender のシェーダーエディタに合わせる */
+        --socket-color: #c7c729;
+        --socket-shader: #63c763;
+        --node-head: #4a4a52;
+        --node-body: #303036;
+        --node-text: #e8e8ec;
+        --noodle: #9a9aa6;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #a996e0;
+          --accent-ink: #c0b1ee;
+          --accent-bg: #221c33;
+          --accent-line: #453a63;
+
+          --absent: #6b727a;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.75rem, 1.3rem + 2.1vw, 2.6rem);
+        line-height: 1.32;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+      .question .detail {
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        color: var(--ink-2);
+      }
+
+      section {
+        margin-top: 3.75rem;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      /* --- 2つのノードの持ち物を比べる ---------------------------------- */
+      /* 「どちらのノードを置いたか」だけで選べる投影が決まる、が答えの全部 */
+
+      .compare {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+      }
+      .card.is-right {
+        border-color: var(--accent);
+      }
+      .card .node {
+        margin: 1rem 1rem 0.75rem;
+        background: var(--node-body);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .card .node .head {
+        background: var(--node-head);
+        color: var(--node-text);
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 0.4rem 0.6rem;
+      }
+      .card .node .socket {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.4rem;
+        padding: 0.3rem 0.6rem 0.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--node-text);
+      }
+      .card .node .pin {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--socket-color);
+        border: 1px solid rgba(0, 0, 0, 0.5);
+      }
+      .card .projections {
+        list-style: none;
+        margin: 0;
+        padding: 0 1.1rem 1.2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .card .projections .label {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.2rem;
+      }
+      .card .projections li.item {
+        font-size: 0.9rem;
+        color: var(--ink-2);
+        padding-left: 1rem;
+        position: relative;
+      }
+      .card .projections li.item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.78em;
+        width: 6px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+      .card .projections li.item.want {
+        color: var(--accent-ink);
+        font-weight: 700;
+      }
+      .card .projections li.item.want::before {
+        background: var(--accent);
+        height: 2px;
+      }
+      .card .verdict {
+        margin-top: auto;
+        padding: 0.7rem 1.1rem;
+        border-top: 1px solid var(--line-soft);
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+      }
+      .card.is-right .verdict {
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+      }
+      .card.is-wrong .verdict {
+        color: var(--absent);
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+
+      .callout {
+        max-width: var(--measure);
+        margin: 1.75rem 0;
+        padding: 1.15rem 1.35rem;
+        background: var(--surface-2);
+        border: 1px solid var(--line-soft);
+        border-left: 2px solid var(--accent);
+      }
+      .callout .label {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.45rem;
+      }
+      .callout p {
+        margin: 0;
+        max-width: none;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Rendering</span
+          ><span class="dot"></span> <span>World / HDRI</span><span class="dot"></span>
+          <span>2026.09.14</span>
+        </div>
+        <h1>ワールドで「正距円筒図」が選べない</h1>
+        <p class="standfirst">
+          選べる投影方式はノードごとに決まっている。項目が無いのではなく、項目を持っていないノードを置いている。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>Blender でワールドの投影方式に「正距円筒図」が出てこない</p>
+        <p class="detail">
+          HDRI をワールドに貼ろうとしたが、投影（Projection）のドロップダウンに「正距円筒図（Equirectangular）」が見つからない。
+        </p>
+      </div>
+
+      <section>
+        <h2>
+          <span class="lead">Answer</span
+          >「環境テクスチャ」ではなく「画像テクスチャ」を使っているのが原因
+        </h2>
+        <p>
+          Blender は<strong>使っているテクスチャノードによって選べる投影方式が違う</strong>。
+        </p>
+
+        <div class="compare">
+          <div class="card is-right">
+            <div class="node">
+              <div class="head">環境テクスチャ</div>
+              <div class="socket">カラー<span class="pin"></span></div>
+            </div>
+            <ul class="projections">
+              <li class="label">選べる投影方式</li>
+              <li class="item want">正距円筒図</li>
+              <li class="item">ミラーボール</li>
+            </ul>
+            <div class="verdict">HDRI はこちら</div>
+          </div>
+
+          <div class="card is-wrong">
+            <div class="node">
+              <div class="head">画像テクスチャ</div>
+              <div class="socket">カラー<span class="pin"></span></div>
+            </div>
+            <ul class="projections">
+              <li class="label">選べる投影方式</li>
+              <li class="item">フラット</li>
+              <li class="item">ボックス</li>
+              <li class="item">球</li>
+              <li class="item">チューブ</li>
+            </ul>
+            <div class="verdict">正距円筒図は無い</div>
+          </div>
+        </div>
+
+        <p>
+          HDRI
+          を貼るときに画像テクスチャノードを追加してしまうと、投影の欄に「正距円筒図」は出てこない。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Fix</span>直し方</h2>
+        <ol class="steps">
+          <li><span>シェーダーエディタを開く</span></li>
+          <li>
+            <span
+              >左上のモードを<strong>「オブジェクト」→「ワールド」</strong>に切り替える</span
+            >
+          </li>
+          <li><span>追加 → テクスチャ → <strong>環境テクスチャ</strong></span></li>
+          <li>
+            <span
+              >環境テクスチャの<strong>カラー出力</strong>を<strong>背景（Background）のカラー入力</strong>につなぐ</span
+            >
+          </li>
+          <li><span>これで投影の欄に「正距円筒図」が表示される</span></li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Other causes</span>他に考えられる原因</h2>
+        <ul class="ticks">
+          <li>
+            プロパティパネルのワールドタブから設定していて、そこでは投影の項目が省略されて見えていない（シェーダーエディタで開けば出る）
+          </li>
+          <li>
+            シェーダーエディタのモードがワールドになっておらず、ワールドのノード自体が表示されていない
+          </li>
+        </ul>
+
+        <div class="callout">
+          <span class="label">補足</span>
+          <p>
+            環境テクスチャで正しく組んでいるのに項目がグレーアウトしている場合は、画面のスクショを見れば原因を特定しやすい。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

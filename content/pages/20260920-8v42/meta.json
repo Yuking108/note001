@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-8v42",
+  "title": "ベベル後に辺を動かすのが大変な問題",
+  "summary": "Ctrl+B は1本の辺を数本に増やすので、以後の編集が重くなる。編集中はベベルモディファイアで持ち、メッシュはローポリのケージのまま保つ。かけてしまった後は距離でマージして戻せる。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/モデリング/ベベル"
+  ],
+  "createdAt": "2026-09-15",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [
+    "20260920-nxa4",
+    "20260920-z0kw"
+  ],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_ベベル後の編集が大変な問題.md をページ化したもの"
+  }
+}

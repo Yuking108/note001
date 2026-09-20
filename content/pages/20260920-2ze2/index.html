@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ボトルと中身（液体）がある複雑な形でのベベル運用</title>
+    <style>
+      /* ------------------------------------------------------------------
+         アクセントはメインラベル（Blender/モデリング）の色＝ベベルウェイトの琥珀。
+         要点がモディファイアの積み順なので、スタックそのものを図にする。
+         ------------------------------------------------------------------ */
+      :root {
+        --bg: #eef0f3;
+        --surface: #ffffff;
+        --surface-2: #f6f7f9;
+        --ink: #14171b;
+        --ink-2: #565e68;
+        --ink-3: #838c97;
+        --line: #d8dce2;
+        --line-soft: #e6e9ed;
+
+        --accent: #9c5f06;
+        --accent-ink: #7a4a05;
+        --accent-bg: #f7ecd8;
+        --accent-line: #dcbe86;
+
+        --danger: #a8402c;
+        --danger-bg: #f8e7e3;
+        --danger-line: #e0b3a8;
+
+        --shadow:
+          0 1px 2px rgba(20, 23, 27, 0.05), 0 8px 24px -16px rgba(20, 23, 27, 0.22);
+
+        --font-display:
+          'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+        --font-body:
+          'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Noto Sans JP', Meiryo,
+          ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+        --measure: 40rem;
+        --cut: 13px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121518;
+          --surface: #1a1e22;
+          --surface-2: #20252a;
+          --ink: #e4e8ec;
+          --ink-2: #a0a9b3;
+          --ink-3: #78828d;
+          --line: #2c3238;
+          --line-soft: #242a2f;
+
+          --accent: #e9a94a;
+          --accent-ink: #f2c07a;
+          --accent-bg: #2e2415;
+          --accent-line: #5b4520;
+
+          --danger: #e08a72;
+          --danger-bg: #2f1c17;
+          --danger-line: #5c332a;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.85;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: calc(var(--measure) + 5rem);
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .masthead {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: clamp(1.7rem, 1.25rem + 2vw, 2.45rem);
+        line-height: 1.34;
+        letter-spacing: 0.02em;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--ink-2);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--line) 3.5rem 100%);
+        margin-top: 2.75rem;
+      }
+
+      .question {
+        margin-top: 2.75rem;
+        padding: 1.6rem 1.75rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        clip-path: polygon(
+          0 0,
+          calc(100% - var(--cut)) 0,
+          100% var(--cut),
+          100% 100%,
+          var(--cut) 100%,
+          0 calc(100% - var(--cut))
+        );
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .question .tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+      }
+      .question .detail {
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        color: var(--ink-2);
+      }
+
+      section {
+        margin-top: 3.75rem;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.4rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        margin: 0 0 0.35rem;
+        text-wrap: balance;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 0.5rem;
+      }
+      h3 {
+        font-family: var(--font-body);
+        font-weight: 700;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        letter-spacing: 0.04em;
+        color: var(--ink-2);
+        margin: 2.5rem 0 0.9rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line-soft);
+      }
+      p {
+        max-width: var(--measure);
+        margin: 1rem 0;
+      }
+      strong {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .kbd {
+        font-family: var(--font-mono);
+        font-size: 0.84em;
+        font-weight: 600;
+        padding: 0.12em 0.45em;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .ui {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        color: var(--accent-ink);
+        white-space: nowrap;
+      }
+
+      .principle {
+        margin: 1.75rem 0;
+        padding: 1.4rem 1.6rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        color: var(--accent-ink);
+        font-family: var(--font-display);
+        font-size: 1.14rem;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+        clip-path: polygon(
+          0 0,
+          calc(100% - var(--cut)) 0,
+          100% var(--cut),
+          100% 100%,
+          var(--cut) 100%,
+          0 calc(100% - var(--cut))
+        );
+      }
+      .principle p {
+        margin: 0;
+        max-width: none;
+      }
+
+      /* --- モディファイアスタック ------------------------------------- */
+      /* 並び順そのものが答えなので、上から下に積んだ形で見せる */
+
+      ol.stack {
+        max-width: 26rem;
+        list-style: none;
+        counter-reset: mod;
+        margin: 1.5rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      ol.stack > li {
+        counter-increment: mod;
+        position: relative;
+        display: grid;
+        grid-template-columns: 1.6rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+        padding: 0.8rem 1rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-bottom: none;
+      }
+      ol.stack > li:last-child {
+        border-bottom: 1px solid var(--line);
+      }
+      ol.stack > li::before {
+        content: counter(mod);
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        color: var(--ink-3);
+        text-align: center;
+      }
+      ol.stack .name {
+        font-weight: 700;
+      }
+      ol.stack .what {
+        display: block;
+        font-size: 0.86rem;
+        font-weight: 400;
+        color: var(--ink-2);
+      }
+      ol.stack > li.is-last {
+        background: var(--accent-bg);
+        border-color: var(--accent-line);
+      }
+      ol.stack > li.is-last .name {
+        color: var(--accent-ink);
+      }
+      ol.stack .optional {
+        font-family: var(--font-mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        border: 1px solid var(--line);
+        padding: 0.02rem 0.4rem;
+        margin-left: 0.4rem;
+        white-space: nowrap;
+      }
+      .stack-caption {
+        max-width: 26rem;
+        margin: 0.6rem 0 0;
+        font-size: 0.82rem;
+        color: var(--ink-3);
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.25rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--ink-3);
+      }
+
+      .callout {
+        max-width: var(--measure);
+        margin: 1.75rem 0;
+        padding: 1.15rem 1.35rem;
+        background: var(--surface-2);
+        border: 1px solid var(--line-soft);
+        border-left: 2px solid var(--danger);
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .callout .label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--danger);
+      }
+      .callout p {
+        margin: 0;
+        max-width: none;
+      }
+
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+        margin: 1.5rem 0;
+      }
+      table {
+        width: 100%;
+        min-width: 28rem;
+        border-collapse: collapse;
+        font-size: 0.93rem;
+      }
+      thead th {
+        font-family: var(--font-mono);
+        font-weight: 400;
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        text-align: left;
+        padding: 0 1rem 0.6rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      tbody td {
+        padding: 0.85rem 1rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      tbody th {
+        text-align: left;
+        font-weight: 700;
+        padding: 0.85rem 1.25rem 0.85rem 0;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question {
+          padding: 1.25rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Modeling</span
+          ><span class="dot"></span> <span>Bevel</span><span class="dot"></span>
+          <span>2026.09.15</span>
+        </div>
+        <h1>ボトルと中身（液体）のベベル運用</h1>
+        <p class="standfirst">
+          モディファイアはオブジェクト単位。だから分ける。分けた時点で、干渉もマテリアルの取り合いも起きなくなる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>複雑な形を作っていて、ボトルの中身（液体）も作った場合はどうする？</p>
+        <p class="detail">
+          ベベルモディファイアはオブジェクト全体にかかるので、ボトルと中身が絡む複雑なモデルではどう運用するのか。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Answer</span>大前提：ボトルと中身は「別オブジェクト」にする</h2>
+        <div class="principle">
+          <p>モディファイアはオブジェクト単位。まず分ける。これが一番効く。</p>
+        </div>
+        <ul class="ticks">
+          <li>ボトルのベベル設定と液体のベベル設定が干渉しない</li>
+          <li>マテリアル（ガラス IOR 1.45 / 水 1.33）を別に持てる</li>
+          <li>片方だけ非表示にして中を確認できる</li>
+        </ul>
+        <p>
+          逆に同一オブジェクトにまとめると、1つのベベルモディファイアが両方にかかるので混乱する。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Bottle</span>回転体は「プロファイル + スクリュー」で持つ</h2>
+        <p>
+          ボトルのような回転体は、円筒をいじるより<strong>断面の輪郭線（プロファイル）を作ってスクリューモディファイアで回す</strong>方が圧倒的に編集しやすい。
+        </p>
+        <ul class="ticks">
+          <li>輪郭の頂点を動かすだけでシルエットが変わる（くびれ、肩、口の絞り）</li>
+          <li>頂点数が少ないので編集が軽い</li>
+          <li>ベベルの帯を何本も動かす問題が最初から起きない</li>
+        </ul>
+
+        <h3>モディファイアの順番</h3>
+        <ol class="stack">
+          <li>
+            <span class="name">スクリュー<span class="what">回転体化</span></span>
+          </li>
+          <li>
+            <span class="name">ソリッド化<span class="what">ガラスの厚み</span></span>
+          </li>
+          <li>
+            <span class="name">ベベル<span class="what">口・底・エッジの面取り</span></span>
+          </li>
+          <li>
+            <span class="name"
+              >ウェイテッドノーマル<span class="optional">任意</span
+              ><span class="what">陰影を整える</span></span
+            >
+          </li>
+          <li class="is-last">
+            <span class="name"
+              >スムーズ by アングル<span class="what">オートスムーズ。必ずスタックの最後</span></span
+            >
+          </li>
+        </ol>
+        <p class="stack-caption">上が先に効く。順番を変えると角の出方が変わる。</p>
+
+        <div class="callout">
+          <span class="label">継ぎ目に注意</span>
+          <p>
+            スクリューの継ぎ目（回転の始点と終点）で<strong>頂点が重複しているとそこだけベベルが破綻する</strong>。スクリューの「マージ」をオンにするか、頂点をマージしてからベベルをかける。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Liquid</span>中身は、ガラスの内壁を流用する</h2>
+        <ol class="steps">
+          <li>
+            <span
+              >ガラスの内側の面を選択して<strong>複製 → 分離</strong>（<span class="kbd">P</span>
+              → 選択物）で別オブジェクトにする</span
+            >
+          </li>
+          <li><span>液面の高さで切って、液面のフタになる面を張る</span></li>
+          <li>
+            <span
+              >液体はガラスに<strong>わずかに食い込ませる</strong>（0.001〜0.01mm 程度）</span
+            >
+          </li>
+        </ol>
+
+        <div class="callout">
+          <span class="label">3 が肝心</span>
+          <p>
+            ガラスと液体の間に空気の隙間があると、レンダリング時に「ガラス → 空気 →
+            液体」と余計な屈折の界面ができて、境目が暗く濁ったように出る。<strong>隙間を作らず、あえてめり込ませる</strong>のが定石。
+          </p>
+        </div>
+
+        <h3>液体のベベル</h3>
+        <ul class="ticks">
+          <li>
+            液面の縁（液体とガラスが接する円）だけ、<strong>ごく小さいベベル</strong>を入れる。実物のメニスカス（液面の張り付き）に近づいて一気にリアルになる
+          </li>
+          <li>
+            液体側は制限方法<span class="ui">ウェイト</span>にして、液面の縁の辺だけウェイト 1
+            を付ける
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Destructive</span>Ctrl+B を使う箇所</h2>
+        <p>「ベベル面の上にさらに作業する」ところは破壊的ベベルの領分。</p>
+        <ul class="ticks">
+          <li>口のネジ山、注ぎ口の返し</li>
+          <li>ラベルの段差、凹みのディテール</li>
+          <li>底の接地リング（へこみ）の作り込み</li>
+        </ul>
+        <p>
+          これらは面取りした面を土台にして押し出したり穴を開けたりするので、実体のあるジオメトリが必要。
+        </p>
+
+        <h3>同一オブジェクト内で部分的に設定を変えたいとき</h3>
+        <p>
+          分けられない事情があるなら、<strong>頂点グループ</strong>で制限したベベルモディファイアを複数重ねる。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">モディファイア</th>
+                <th scope="col">制限</th>
+                <th scope="col">用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ベベル1</th>
+                <td>頂点グループ「口」</td>
+                <td>口周りを太めに</td>
+              </tr>
+              <tr>
+                <th scope="row">ベベル2</th>
+                <td>頂点グループ「胴」</td>
+                <td>胴の角を細く</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Shading</span>スムーズシェード</h2>
+        <p>
+          最後に<strong>シェードのオートスムーズ</strong>（Smooth by
+          Angle）を全モディファイアの後ろに置く。回転体は角度 30°
+          の既定でだいたい素直に出る。液面の縁など「ここは角を立てたい」辺には<strong>シャープをマーク</strong>する。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Summary</span>まとめ</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">対象</th>
+                <th scope="col">方針</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ボトルと中身</th>
+                <td>必ず別オブジェクト。モディファイアはオブジェクト単位</td>
+              </tr>
+              <tr>
+                <th scope="row">ボトルの形</th>
+                <td>プロファイル + スクリューで非破壊。輪郭だけ編集</td>
+              </tr>
+              <tr>
+                <th scope="row">ボトルのベベル</th>
+                <td>モディファイア + 辺ごとのベベルウェイト</td>
+              </tr>
+              <tr>
+                <th scope="row">液体</th>
+                <td>内壁を複製して分離、ガラスに微妙にめり込ませる</td>
+              </tr>
+              <tr>
+                <th scope="row">液面の縁</th>
+                <td>極小ベベルでメニスカス表現</td>
+              </tr>
+              <tr>
+                <th scope="row">ネジ山・ラベル段差</th>
+                <td>Ctrl+B（上にさらに作業するため）</td>
+              </tr>
+              <tr>
+                <th scope="row">オートスムーズ</th>
+                <td>必ずスタックの最後</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

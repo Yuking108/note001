@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-2cot",
+  "title": "シーケンサーで秒表示に切り替える（Ctrl+T）",
+  "summary": "Ctrl+T で SMPTE タイムコード表示に切り替わる。シーケンサーとタイムラインエディターは別設定で、マウスカーソルを置いているエディターにだけ効く。",
+  "mainLabel": "Blender/ビデオ編集",
+  "subLabels": [
+    "Blender/Q&A"
+  ],
+  "createdAt": "2026-09-20",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_シーケンサーで秒表示に切り替える.md をページ化したもの"
+  }
+}

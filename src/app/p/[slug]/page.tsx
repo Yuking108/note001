@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageFrame } from '@/components/PageFrame';
-import { allPages, findPage, labelUrl, pageHtmlUrl } from '@/lib/content';
+import { allPages, findPage, labelUrl, pageHtmlUrl, relatedPages } from '@/lib/content';
 
 type Params = { slug: string };
 
@@ -20,6 +20,10 @@ export default async function PageDetail({ params }: { params: Promise<Params> }
   const { slug } = await params;
   const page = findPage(slug);
   if (page === undefined) notFound();
+
+  // 関連はアプリ側で出す。本文は allow-same-origin なしの iframe なので、
+  // 本文中に書いた <a> では親を遷移させられない
+  const related = relatedPages(page.id);
 
   return (
     <article className="mx-auto max-w-[1100px] px-4 py-6">
@@ -77,6 +81,36 @@ export default async function PageDetail({ params }: { params: Promise<Params> }
       <div className="overflow-hidden rounded-lg border border-border-base">
         <PageFrame src={pageHtmlUrl(page.id)} title={page.title} />
       </div>
+
+      {related.length > 0 ? (
+        <nav className="mt-6">
+          <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.16em] text-fg-faint">
+            関連ノート
+          </h2>
+          <ul className="space-y-2">
+            {related.map((linked) => (
+              <li key={linked.id}>
+                <Link
+                  href={`/p/${linked.id}/`}
+                  className="group block rounded-lg border border-border-base bg-bg-elevated p-3 transition-colors hover:border-border-strong"
+                >
+                  <span className="block text-sm font-semibold leading-snug text-fg group-hover:text-accent">
+                    {linked.title}
+                  </span>
+                  {linked.summary !== '' ? (
+                    <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-fg-muted">
+                      {linked.summary}
+                    </span>
+                  ) : null}
+                  <span className="mt-1.5 block font-mono text-[11px] text-fg-faint">
+                    {linked.mainLabel}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : null}
     </article>
   );
 }

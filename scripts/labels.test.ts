@@ -169,6 +169,7 @@ const v2Registry = resolveRegistry({
     { path: 'Blender/モデリング', description: '形を作る作業', aliases: ['Modeling'] },
     { path: 'Blender/モデリング/ベベル', description: '3段目のサブラベル' },
     { path: 'Blender/レンダリング', description: 'レンダリング' },
+    { path: 'Blender/Q&A', section: false, description: '形式。セクションではない', aliases: ['QandA'] },
     { path: 'After Effects', kind: 'app', description: '対象アプリ' },
     { path: 'After Effects/テキスト', description: 'テキスト' },
     { path: '形式', kind: 'axis', description: '記述の性質' },
@@ -201,6 +202,32 @@ check('メインラベルは2段ちょうど。1段や3段はエラー', () => {
 
 check('メインラベルの第一階層は kind:app だけ（補助軸は不可）', () => {
   assert.equal(resolveMainLabel('形式/Q&A', v2Registry).ok, false);
+});
+
+check('section:false のラベルは固定リストに入らず、メインラベルにできない', () => {
+  // アプリ直下の2段ラベルだが、公式ドキュメントのセクションではない
+  assert.ok(v2Registry.nonSections.has('Blender/Q&A'));
+  assert.equal(v2Registry.sectionsOf.get('Blender')?.includes('Blender/Q&A'), false);
+  assert.equal(resolveMainLabel('Blender/Q&A', v2Registry).ok, false);
+  // サブラベルとしては通常どおり使える（別名でも引ける）
+  assert.deepEqual(resolveLabel('Blender/Q&A', v2Registry), { ok: true, path: 'Blender/Q&A' });
+  assert.deepEqual(resolveLabel('QandA', v2Registry), {
+    ok: true,
+    path: 'Blender/Q&A',
+    renamedFrom: 'QandA',
+  });
+});
+
+check('section:false を第二階層以外に付けたらエラー', () => {
+  const misplaced = resolveRegistry({
+    schemaVersion: 2,
+    labels: [
+      { path: 'Blender', kind: 'app', description: 'アプリ' },
+      { path: 'Blender/モデリング', description: 'セクション' },
+      { path: 'Blender/モデリング/ベベル', section: false, description: '3段目に section' },
+    ],
+  });
+  assert.ok(misplaced.issues.some((i) => i.level === 'error'));
 });
 
 check('空白を含むアプリ名でもメインラベルとして通る', () => {
@@ -250,6 +277,7 @@ const pages: IndexedPage[] = [
     mainLabel: '技術/SQLite',
     subLabels: ['技術/全文検索', '形式/調べ物'],
     allLabels: ['技術/SQLite', '技術/全文検索', '形式/調べ物'],
+    links: [],
     createdAt: '2026-09-20',
     updatedAt: '2026-09-20',
   },
@@ -260,6 +288,7 @@ const pages: IndexedPage[] = [
     mainLabel: '技術/SQLite',
     subLabels: [],
     allLabels: ['技術/SQLite'],
+    links: [],
     createdAt: '2026-09-21',
     updatedAt: '2026-09-21',
   },
@@ -270,6 +299,7 @@ const pages: IndexedPage[] = [
     mainLabel: '形式/調べ物',
     subLabels: [],
     allLabels: ['形式/調べ物'],
+    links: [],
     createdAt: '2026-09-22',
     updatedAt: '2026-09-22',
   },

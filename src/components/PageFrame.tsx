@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const MIN_HEIGHT = 240;
 const MAX_HEIGHT = 40000;
@@ -21,6 +21,15 @@ export function PageFrame({ src, title }: { src: string; title: string }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
 
+  /**
+   * 本文に「いま測って送り直せ」と頼む。
+   * 本文側は高さが変わったときしか送らないので、リスナーを張る前に届いた1通を
+   * 取りこぼすと iframe が初期値のまま固定され、中身側にスクロールバーが出る。
+   */
+  const requestHeight = useCallback(() => {
+    frameRef.current?.contentWindow?.postMessage({ type: 'note001:measure' }, '*');
+  }, []);
+
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const frame = frameRef.current;
@@ -37,8 +46,16 @@ export function PageFrame({ src, title }: { src: string; title: string }) {
     };
 
     window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, []);
+
+    // 読み込みの速い iframe はこの時点で既に送信を終えている。数回に分けて催促する
+    // （1回目は本文の script がまだ走っていないことがある）。
+    const timers = [0, 60, 240, 800, 2000].map((delay) => window.setTimeout(requestHeight, delay));
+
+    return () => {
+      window.removeEventListener('message', onMessage);
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, [requestHeight]);
 
   return (
     <iframe
@@ -46,6 +63,7 @@ export function PageFrame({ src, title }: { src: string; title: string }) {
       src={src}
       title={title}
       sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+      onLoad={requestHeight}
       style={{ height: `${height}px` }}
       className="block w-full border-0 bg-bg-elevated"
     />

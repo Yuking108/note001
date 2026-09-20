@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "id": "20260920-jsss",
+  "title": "マテリアルのバンプ設定（最新バージョン）",
+  "summary": "ノードの組み方は 2.8 系から変わっていない。古い解説と違うのは、4.0 以降プリンシプルBSDFの「ノーマル」がジオメトリパネルに移ったため。最多の失敗はテクスチャのカラースペースを非カラーにし忘れること。",
+  "mainLabel": "Blender/レンダリング",
+  "subLabels": [
+    "Blender/Q&A"
+  ],
+  "createdAt": "2026-09-18",
+  "updatedAt": "2026-09-20",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "note": "docs/Q&A_マテリアルのバンプ設定.md をページ化したもの"
+  }
+}
