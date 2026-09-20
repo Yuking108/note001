@@ -39,9 +39,16 @@ export function relatedPages(id: string): IndexedPage[] {
     .filter((linked): linked is IndexedPage => linked !== undefined);
 }
 
-/** 本文の配信先。trailingSlash の影響を受けないよう末尾はファイル名で終える */
+/**
+ * 本文の配信先。
+ *
+ * `index.html` まで書かない。trailingSlash: true の静的出力では、ホストが
+ * `index.html` を URL から取り除いた形だけを配信するため（Vercel では
+ * `/pages/<slug>/index.html` が 404 になる）。
+ * `next dev` だけはディレクトリ形式を解決しないので、next.config.ts の rewrite で合わせている。
+ */
 export function pageHtmlUrl(id: string): string {
-  return `/pages/${id}/index.html`;
+  return `/pages/${id}/`;
 }
 
 export function labelUrl(path: string, extra: string[] = []): string {
