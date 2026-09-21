@@ -129,8 +129,12 @@ log "取り込み元: $VAULT"
 # iCloud Drive は TCC の保護下にあり、フォルダの一覧は取れても**ファイルの中身は読めない**
 # ことがある（launchd 配下の bash にフルディスクアクセスが無い場合）。
 # ここで気づかないと「毎晩 全件失敗」を静かに繰り返す
-sample="$(find "$VAULT" -maxdepth 1 -name '*.md' -print 2>/dev/null | head -1)"
-if [ -n "$sample" ] && ! head -c 1 "$sample" >/dev/null 2>&1; then
+# md はフォルダの中にあるので深さを見る。見つからないときは確認自体を諦めない
+sample="$(find "$VAULT" -maxdepth 3 -name '*.md' -print 2>/dev/null | head -1)"
+if [ -z "$sample" ]; then
+  abort "取り込み元に md が1つも見当たりません（フォルダを読めていない可能性）: $VAULT"
+fi
+if ! head -c 1 "$sample" >/dev/null 2>&1; then
   abort "取り込み元の md を読めません。システム設定 > プライバシーとセキュリティ > フルディスクアクセス に /bin/bash を追加してください（docs/daily-import.md §9）"
 fi
 brctl download "$VAULT" >/dev/null 2>&1 ||
