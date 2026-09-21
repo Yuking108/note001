@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20260922-iemh",
+  "title": "ループ選択ができない（左下にパネルが出る）",
+  "summary": "左下のパネルは「直前の操作」パネルでエラーではなく、ループ選択自体は実行されている。選択範囲が想定と違う原因は4つで、Mac で最も多いのはプリファレンス > 入力の「3ボタンマウスを再現」が Alt+クリックを奪っているケース。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/ユーザーインターフェース"
+  ],
+  "createdAt": "2026-09-22",
+  "updatedAt": "2026-09-22",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A_ループ選択ができない.md",
+    "note": "docs/Q&A_ループ選択ができない.md を夜間取り込みでページ化したもの"
+  }
+}
