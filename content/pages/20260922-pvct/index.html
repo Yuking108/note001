@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>グラフエディターを横に広げる</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、Before/After の対比（× 詰まった表示 /
+         ◯ Home 後）だけ色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --ok: #2f6f4f;
+        --no: #a3402b;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --ok: #71c79c;
+          --no: #e2907a;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .question {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .question .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-size: 1.1rem;
+      }
+      .question .detail {
+        margin-top: 0.4rem;
+        font-size: 0.95rem;
+        color: var(--fg-muted);
+      }
+
+      /* 答えそのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      figure.diagram {
+        max-width: 30rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question,
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>グラフエディターを横に広げる</h1>
+        <p class="standfirst">
+          まず <code>Home</code> を押す。キーが左端に固まって見えるのはたいていフレーム範囲が広がりすぎているだけで、これ一発で直る。それでも足りないときだけ「表示のズーム」と「エディター自体の大きさ」を分けて考える。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>グラフエディターを横に広くしたい</p>
+        <p class="detail">キーフレームが左端に固まっていて見づらい。横方向に広げたい。</p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Answer</span>「表示のズーム」と「エディター自体の大きさ」の2通りある</h2>
+
+        <div class="verdict">
+          <span class="big">グラフエディターにマウスを置いて <code>Home</code>。すべてのキーフレームが画面いっぱいに収まるようにフィットする。</span>
+          <p>
+            フレーム範囲が -1728〜2688 のように無駄に広がってしまっている状態は、これだけで直る。<strong>「横に広げたい」の大半はズームの話で、エディターの領域は狭くない。</strong>
+          </p>
+        </div>
+
+        <h3>どっちの話か</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">使うもの</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">キーが左端に固まって見づらい</th>
+                <td><code>Home</code>（全体表示）</td>
+              </tr>
+              <tr>
+                <th scope="row">横方向だけ伸ばしたい</th>
+                <td><code>Ctrl</code> + 中ボタンドラッグを左右に</td>
+              </tr>
+              <tr>
+                <th scope="row">見たい区間だけ表示したい</th>
+                <td>ビュー &gt; フレーム範囲をプレビュー</td>
+              </tr>
+              <tr>
+                <th scope="row">領域そのものが狭い</th>
+                <td><code>Ctrl</code> + <code>Space</code> で全画面化</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 1</span>まずこれ：<code>Home</code> で全体表示</h2>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 380 240" role="img" aria-label="Home を押す前はフレーム範囲が広すぎてキーフレームが左端に固まっている。Home を押すと全てのキーがエディターの幅いっぱいに広がる">
+            <g font-family="ui-monospace, Menlo, monospace" font-size="9" fill="var(--fg-muted)">
+              <text x="16" y="16" fill="var(--no)">Before — キーが左端に固まる</text>
+              <rect
+                x="14"
+                y="24"
+                width="352"
+                height="70"
+                fill="none"
+                stroke="var(--border)"
+                stroke-width="1"
+              />
+              <polyline
+                points="24,82 40,56 58,74 74,46"
+                fill="none"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+              />
+              <g fill="var(--accent)">
+                <polygon points="24,78 28,82 24,86 20,82" />
+                <polygon points="40,52 44,56 40,60 36,56" />
+                <polygon points="58,70 62,74 58,78 54,74" />
+                <polygon points="74,42 78,46 74,50 70,46" />
+              </g>
+              <text x="16" y="108">-1728</text>
+              <text x="340" y="108">2688</text>
+
+              <line x1="190" y1="118" x2="190" y2="136" stroke="var(--fg-muted)" stroke-width="1" />
+              <polygon points="190,142 186,132 194,132" fill="var(--fg-muted)" />
+              <text x="200" y="134" fill="var(--fg)">Home</text>
+
+              <text x="16" y="164" fill="var(--ok)">After — 全キーが幅いっぱいに収まる</text>
+              <rect
+                x="14"
+                y="172"
+                width="352"
+                height="70"
+                fill="none"
+                stroke="var(--border)"
+                stroke-width="1"
+              />
+              <polyline
+                points="30,230 140,198 245,222 352,194"
+                fill="none"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+              />
+              <g fill="var(--accent)">
+                <polygon points="30,226 34,230 30,234 26,230" />
+                <polygon points="140,194 144,198 140,202 136,198" />
+                <polygon points="245,218 249,222 245,226 241,222" />
+                <polygon points="352,190 356,194 352,198 348,194" />
+              </g>
+            </g>
+          </svg>
+          <figcaption>
+            横方向に広げたいという感覚の正体は、たいてい「フレーム範囲が広すぎる」。<code>Home</code> はその範囲をキーの実際の幅に合わせ直す。
+          </figcaption>
+        </figure>
+
+        <ul class="ticks">
+          <li><code>Home</code> … 全てのキーを表示（ビュー &gt; 全てをフレームイン）</li>
+          <li>テンキー <code>.</code> … 選択したキーだけにズーム（ビュー &gt; 選択をフレームイン）</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 2</span>横方向だけズームする</h2>
+        <p>
+          <code>Home</code> で全体が見えたうえで、さらに X（フレーム方向）だけ伸び縮みさせたい場合。縦横を独立して操作できるのは <strong><code>Ctrl</code> + 中ボタンドラッグ</strong>で、左右にドラッグするとX方向だけ変わる。
+        </p>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">効果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><code>Ctrl</code> + 中ボタンドラッグ</th>
+                <td>縦横を独立してズーム。<strong>左右にドラッグするとX（フレーム方向）だけ伸び縮みする</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">下端スクロールバーの丸い端をドラッグ</th>
+                <td>X方向だけズーム</td>
+              </tr>
+              <tr>
+                <th scope="row">マウスホイール</th>
+                <td>縦横まとめてズーム</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>Ctrl</code> + ホイール</th>
+                <td>横スクロール</td>
+              </tr>
+              <tr>
+                <th scope="row">2本指の左右スワイプ</th>
+                <td>横スクロール（トラックパッド）</td>
+              </tr>
+              <tr>
+                <th scope="row">ピンチ</th>
+                <td>ズーム（トラックパッド）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 3</span>表示するフレーム範囲を絞る</h2>
+        <p>
+          見たい区間だけを表示したいなら、ズームで寄せるのではなく基準そのものを狭める。
+        </p>
+        <ul class="ticks">
+          <li>ビュー &gt; <strong>フレーム範囲をプレビュー</strong></li>
+          <li>タイムラインの開始 / 終了フレームを狭める</li>
+        </ul>
+        <p>どちらも、その範囲がエディターの基準になる。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Area</span>エディター（領域）自体を大きくしたい場合</h2>
+        <p>ズームではなく、領域そのものが狭いとき。</p>
+        <ol class="steps">
+          <li><span><strong>エリアの境界線をドラッグ</strong> — 一番素直な方法</span></li>
+          <li>
+            <span>
+              <strong><code>Ctrl</code> + <code>Space</code></strong> — マウスが乗っているエディターを一時的に全画面化。もう一度押すと元のレイアウトに戻る。<strong>グラフを細かく編集するときはこれが一番速い</strong>
+            </span>
+          </li>
+          <li><span>境界線を右クリック &gt; エリアを分割 / 統合 — レイアウトそのものを組み替える</span></li>
+          <li>
+            <span>画面上部のワークスペースタブで <strong>Animation</strong> に切り替える — アニメーション向けのレイアウトになる</span>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Note</span>この2つは全エディター共通</h2>
+        <div class="note">
+          <p>
+            <code>Home</code> は3Dビューポートやシーケンサーなど他のエディターでも「全体を表示」として共通で使える。<code>Ctrl+Space</code> の最大化トグルも全エディター共通なので、この2つを覚えておくと作業が速い。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

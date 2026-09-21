@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "20260922-pvct",
+  "title": "グラフエディターを横に広げる",
+  "summary": "対処は「表示のズーム」と「エディター領域自体の拡大」の2通り。まず `Home` で全キーフレームをフィットさせ、横方向だけ伸ばすなら `Ctrl`+中ボタンの左右ドラッグ、領域ごと広げるなら `Ctrl`+`Space` の最大化トグルが最速。",
+  "mainLabel": "Blender/エディター",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/アニメーションとリギング",
+    "Blender/ユーザーインターフェース"
+  ],
+  "createdAt": "2026-09-22",
+  "updatedAt": "2026-09-22",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A_グラフエディターを横に広げる.md",
+    "note": "docs/Q&A_グラフエディターを横に広げる.md を夜間取り込みでページ化したもの"
+  }
+}
