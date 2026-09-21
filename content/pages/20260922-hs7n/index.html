@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>アニメーションのフレーム設計とオーバーラップ（遅延）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、可否の対比（✕ デッドストップ / ◯ オーバー
+         ラップ）とタイムライン図の分だけ色を足す。足した色は明色・暗色の
+         両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --ok: #2f6f4f;
+        --no: #a3402b;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --ok: #71c79c;
+          --no: #e2907a;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td.judge-ok {
+        color: var(--ok);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      td.judge-no {
+        color: var(--no);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 答えそのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 2.5rem 0 1.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+        box-shadow: var(--shadow);
+      }
+      .verdict .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      figure.diagram {
+        max-width: 32rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>アニメーションのフレーム設計とオーバーラップ（遅延）</h1>
+        <p class="standfirst">
+          素人っぽい動きの正体は、キーが等間隔なことと、前の動きが完全に止まってから次が始まること。尺は秒（24の倍数）で設計し、<strong>次の動きの開始だけは倍数から外して、前の動きの減速区間に数フレーム食い込ませる</strong>。チュートリアルでいう「遅延」はこれのこと。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="tag">Answer</span>
+        <span class="big">
+          カメラのアニメーションが終わる数フレーム前に、被写体のアニメーションを開始する。24fps なら <code>3〜12F</code> 程度、カメラのイーズアウト（減速）区間に食い込ませる。
+        </span>
+        <p>
+          「間を空ける」のではなく、<strong>前の動きが完全に止まりきる前に次の動きを始めて、2つを重ねる</strong>。英語圏では overlapping action（オーバーラッピングアクション）と呼ばれ、アニメーション12原則の「フォロースルーとオーバーラッピングアクション」にあたる。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Goal</span>重ねると何が変わるか</h2>
+        <ul class="ticks">
+          <li>
+            <strong>デッドストップ（完全停止）が消える</strong> — 1つのアクションが完全に止まってから次が始まる厳密な逐次進行が、機械的・人工的に見える原因。
+          </li>
+          <li>
+            <strong>モメンタム（勢い）が次の動きに引き継がれる</strong> — 現実の物体には慣性がある。タイミングをずらして重ねると重さや質量が伝わる。
+          </li>
+          <li>
+            <strong>カメラのイーズアウト区間の「死んだ時間」が埋まる</strong> — 終わり際の数フレームはほとんど絵が変わらない。ここで被写体を動かし始めると、<strong>カメラが止まったことが観客に気づかれなくなる</strong>。
+          </li>
+          <li>
+            <strong>視線が自然に受け渡される</strong> — カメラの動きから被写体の動きへ、注目が途切れずにバトンタッチされる。
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Before</span>前提：1秒 = 24フレーム</h2>
+        <p>
+          映画の標準フレームレートが 24fps で、<strong>Blender のデフォルトも 24fps</strong>（出力プロパティ &gt; フォーマット &gt; フレームレート）。デフォルトの終了フレーム 250 は、24fps でおよそ10秒にあたる。つまり <strong>フレーム数 ÷ 24 = 秒数</strong>。
+        </p>
+        <ul class="ticks">
+          <li><code>24</code> = 1秒 ／ <code>48</code> = 2秒 ／ <code>12</code> = 0.5秒 ／ <code>6</code> = 0.25秒</li>
+          <li>
+            「何フレームか」ではなく「<strong>何秒に見えるか</strong>」で判断するクセをつける。fps を 30 や 60 に変えたら、同じ見え方にするにはフレーム数も換算し直す必要がある。
+          </li>
+        </ul>
+
+        <h3>「24の倍数で区切るとよい」の正しい解釈</h3>
+        <p>ここは言い方によって正しくも間違いにもなる。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">解釈</th>
+                <th scope="col">判定</th>
+                <th scope="col">理由</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">尺・カット・演出の「区切り」を秒単位（24の倍数）で設計する</th>
+                <td class="judge-ok">⭕ 正しい</td>
+                <td>秒で考えられるので尺の計算が楽。音・カット割り・ループと合わせやすい</td>
+              </tr>
+              <tr>
+                <th scope="row">アニメーション内の<strong>すべてのキーフレーム</strong>を24の倍数に置く</th>
+                <td class="judge-no">✕ 間違い</td>
+                <td>全部が等間隔になり、機械的・ロボット的な動きになる</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <p>
+            後者はアニメーションの世界で <strong>"even spacing syndrome"（等間隔症候群）</strong> と呼ばれる典型的な失敗。「各フレームが同じ距離だけ動くと、ショットはロボットのように見える」とされている。
+          </p>
+          <p>
+            <strong>マクロ</strong>（全体の尺・カットの区切り・ブロックの長さ）は24の倍数で気持ちよく設計してよい。<strong>ミクロ</strong>（1つの動きの中のキー間隔、次の動きの開始タイミング）は24の倍数から意図的に外す。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Steps</span>Blender での手順</h2>
+        <ol class="steps">
+          <li>
+            <span>
+              <strong>fps を確認する</strong> — 出力プロパティ &gt; フォーマット &gt; フレームレート。24以外（30 / 60）にするなら、以下のフレーム数は全部換算し直す。
+            </span>
+          </li>
+          <li>
+            <span>
+              <strong>秒表示に切り替える</strong> — タイムライン／ドープシートの ビュー &gt; <strong>秒</strong> を ON。尺の設計は秒で、重ねる量はフレームで、と見方を使い分ける。
+            </span>
+          </li>
+          <li>
+            <span>
+              <strong>尺とカットの区切りを置く</strong> — ここはマクロなので24の倍数でよい。
+            </span>
+          </li>
+          <li>
+            <span>
+              <strong>どこから重ねるか決める</strong> — グラフエディターでカメラの F カーブを見て、<strong>傾きが寝てくる（減速に入る）あたり</strong>を被写体の開始フレームにする。数字で決めるより、カーブを見たほうが早い。
+            </span>
+          </li>
+          <li>
+            <span>
+              <strong>被写体のキーをまとめて前にずらす</strong> — ドープシートで被写体のキーを全選択 → <code>G</code> → <code>-6</code> → <code>Enter</code> で6フレーム手前へ。これがオーバーラップ調整の基本操作。
+            </span>
+          </li>
+          <li>
+            <span>
+              <strong>再生して詰める</strong> — 「止まった感じ」が消えるまで調整する。イーズの効き具合はグラフエディターのハンドルで変えられるので、<strong>減速区間の長さ自体</strong>もコントロールする。
+            </span>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Timing</span>どれくらい重ねるか</h2>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 380 224"
+            role="img"
+            aria-label="3つのタイミングの比較。NGのデッドストップはカメラが1から48フレーム、被写体が49から96フレームで、間で動きが一度止まる。NGの完全同時は両方が1から48フレームで動く。OKのオーバーラップはカメラが1から48フレーム、被写体が42から90フレームで、カメラが減速している6フレームに被写体が食い込む"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="9" fill="var(--fg-muted)">
+              <!-- ① NG：デッドストップ -->
+              <text x="10" y="13" fill="var(--no)">✕ デッドストップ</text>
+              <text x="10" y="31">カメラ</text>
+              <rect x="70" y="23" width="143" height="9" rx="2" fill="var(--accent)" />
+              <text x="10" y="47">被写体</text>
+              <rect x="216" y="39" width="144" height="9" rx="2" fill="var(--accent)" opacity="0.5" />
+              <line
+                x1="214.5"
+                y1="19"
+                x2="214.5"
+                y2="52"
+                stroke="var(--no)"
+                stroke-width="1"
+                stroke-dasharray="3 2"
+              />
+              <text x="70" y="64" font-size="8" fill="var(--no)">被写体は 49F 開始 ── 48と49の間で動きが一度死ぬ</text>
+
+              <!-- ② NG：完全同時 -->
+              <text x="10" y="97" fill="var(--no)">✕ 完全同時</text>
+              <text x="10" y="115">カメラ</text>
+              <rect x="70" y="107" width="143" height="9" rx="2" fill="var(--accent)" />
+              <text x="10" y="131">被写体</text>
+              <rect x="70" y="123" width="143" height="9" rx="2" fill="var(--accent)" opacity="0.5" />
+              <text x="70" y="148" font-size="8" fill="var(--no)">両方 1–48F ── 同時に動くのでどちらも読めない</text>
+
+              <!-- ③ OK：オーバーラップ -->
+              <text x="10" y="181" fill="var(--ok)">◯ オーバーラップ</text>
+              <text x="10" y="199">カメラ</text>
+              <rect x="70" y="191" width="143" height="9" rx="2" fill="var(--accent)" />
+              <text x="10" y="215">被写体</text>
+              <rect x="195" y="207" width="146" height="9" rx="2" fill="var(--accent)" opacity="0.5" />
+              <rect
+                x="195"
+                y="188"
+                width="18"
+                height="31"
+                fill="none"
+                stroke="var(--ok)"
+                stroke-width="1"
+                stroke-dasharray="3 2"
+              />
+            </g>
+          </svg>
+          <figcaption>
+            ◯ の例はカメラ 1–48F に対して被写体 42–90F。点線で囲った6フレーム、つまりカメラが減速している区間に被写体の動き出しを食い込ませている。
+          </figcaption>
+        </figure>
+
+        <ul class="ticks">
+          <li><strong>目安は数フレーム〜十数フレーム</strong>（24fps で <code>3〜12F</code> 程度）。</li>
+          <li>
+            重ねすぎると「完全同時」に近づき、両方の動きが読めなくなる。<strong>カメラの動きの主要部分（大きく絵が変わる部分）は終わっていること</strong>が条件。
+          </li>
+          <li>逆に数フレームしか重ねないと効果が薄い。再生して「止まった感じ」が消えるまで調整する。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Pitfalls</span>つまずきやすい点</h2>
+        <ul class="ticks">
+          <li>
+            <strong>24の倍数にスナップさせすぎない。</strong> 特に次の動きの開始フレームは、意図的に倍数から外すことになる。
+          </li>
+          <li>
+            ここに挙げたフレーム数は <strong>"starting points, not laws"（出発点であって法則ではない）</strong>。必ず再生して目で確認し、動きの大きさ・速度に合わせて詰める。
+          </li>
+          <li>
+            オーバーラップの気持ちよさは、<strong>カメラ側のイーズアウトの効き具合</strong>に左右される。ハンドルで減速区間の長さ自体を調整する。
+          </li>
+          <li>
+            <strong>カメラと被写体に限らない。</strong> オブジェクトA→オブジェクトB、本体→付属物（布・髪・アンテナなど）でも同じ考え方が使える。
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Note</span>「間（ため）を置く」テクニックとの違い</h2>
+        <p>
+          別のテクニックとして「ポーズを見せるために動きを一瞬止める（ホールド／ビート）」というものもあり、これも正しい。ただし<strong>目的が逆</strong>なので混同しないこと。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"></th>
+                <th scope="col">オーバーラップ（本項）</th>
+                <th scope="col">ホールド／間</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">やること</th>
+                <td>次の動きを前倒しして重ねる</td>
+                <td>動きを止めて保持する</td>
+              </tr>
+              <tr>
+                <th scope="row">目的</th>
+                <td>流れ・勢いを途切れさせない</td>
+                <td>ポーズや情報を読ませる</td>
+              </tr>
+              <tr>
+                <th scope="row">使う場面</th>
+                <td>カメラ→被写体など、動きを繋げたいとき</td>
+                <td>見せ場、演出の区切り、情報の切り替え</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
