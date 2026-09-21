@@ -376,18 +376,18 @@ npm run new -- --title "ベベル後の編集が大変な問題" --main "Blender
 
 ### 8.4 夜間の自動取り込み
 
-Obsidian（`iCloud~md~obsidian/.../Blender/`）に増えた md は、毎日 0:10 に launchd が
+Obsidian（`iCloud~md~obsidian/.../Blender/` の `Q&A` / `テクニック` / `知識`）に増えた md は、毎日 0:10 に launchd が
 `scripts/import-daily.sh` を呼び、上の手順 1〜6 を無人で回して push する。詳細は **docs/daily-import.md**。
 
 手順4（本人がラベルを確定する）だけは無人化できないため、自動実行では次のように代替している。
 
-- frontmatter の `tags` を最も強い手掛かりにして、本文と突き合わせてラベルを決める
-  （Q&A 以外のノートも来る。ファイル名の接頭辞では判断しない）
+- 置かれているフォルダと frontmatter の `tags` を手掛かりにし、本文と突き合わせてラベルを決める
+  （フォルダは `Blender/Q&A` / `Blender/テクニック` / `Blender/知識` に対応。この3つは互いに排他）
 - 新規ラベルは作らせない。サブラベルは既存レジストリから選ぶだけ
 - メインラベルを決めきれない md は**ページ化せず見送り**、理由をログに残す
 - 見送った md は本人が書き直せば自動で再挑戦の対象に戻る
 
-ページ化済みかどうかは `meta.json` の `source.file`（取り込み元の md のファイル名）で判定する。
+ページ化済みかどうかは `meta.json` の `source.file`（取り込み元からの相対パス。例 `Q&A/Q&A_xxx.md`）で判定する。
 
 ---
 

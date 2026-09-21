@@ -178,14 +178,19 @@ while IFS= read -r md_file; do
   log "--- $md_file ---"
 
   # 原文をリポジトリに取り込む。以降はリポジトリ内のコピーだけを見る
-  # （claude に iCloud 配下へのアクセスを許可せずに済む）
+  # （claude に iCloud 配下へのアクセスを許可せずに済む）。
+  # 取り込み元のフォルダ構成（Q&A / テクニック / 知識）は docs/ 側にもそのまま写す
+  folder="$(dirname "$md_file")"
+  [ "$folder" = "." ] && folder=""
+  mkdir -p "docs/$folder"
   if ! cp "$VAULT/$md_file" "docs/$md_file"; then
     log "失敗 $md_file: 原文をコピーできませんでした"
     failed=$((failed + 1)); continue
   fi
 
   # 1. 分類（読むだけ）
-  prompt="$(render scripts/import/classify-prompt.md MD_FILE "$md_file")"
+  prompt="$(render scripts/import/classify-prompt.md \
+    MD_FILE "$md_file" FOLDER "${folder:-（フォルダ無し）}")"
   if ! run_claude "$TMP_DIR/classify.json" "$CLASSIFY_TIMEOUT" \
     -p "$prompt" \
     --model "$MODEL" \

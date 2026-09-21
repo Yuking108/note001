@@ -13,12 +13,18 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { META_FILENAME, PAGES_DIR, VAULT_DIR, VAULT_INDEX_NOTE } from './paths';
+import {
+  META_FILENAME,
+  PAGES_DIR,
+  VAULT_DIR,
+  VAULT_IGNORED_DIRS,
+  VAULT_INDEX_SUFFIX,
+} from './paths';
 import { loadState } from './import-state';
 import type { PageMeta } from '../src/lib/types';
 
 export type PendingNote = {
-  /** md のファイル名（拡張子込み） */
+  /** 取り込み元からの相対パス（`Q&A/Q&A_xxx.md`）。フォルダ名ごと持つ */
   file: string;
   /** Obsidian 側の絶対パス */
   path: string;
@@ -26,7 +32,16 @@ export type PendingNote = {
   size: number;
 };
 
-/** すでにページ化された md のファイル名 */
+/**
+ * ファイル名の比較は NFC に寄せてから行う。
+ * macOS のファイルシステムと JSON に書かれた文字列で、濁点の表現（NFC / NFD）が
+ * 食い違うことがあり、そのままでは「取り込み済みなのに未取り込み」と誤判定する
+ */
+function key(file: string): string {
+  return file.normalize('NFC');
+}
+
+/** すでにページ化された md の相対パス */
 function importedFiles(): Set<string> {
   const files = new Set<string>();
   if (!fs.existsSync(PAGES_DIR)) return files;
@@ -38,7 +53,7 @@ function importedFiles(): Set<string> {
     try {
       const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8')) as PageMeta;
       const file = meta.source?.file;
-      if (typeof file === 'string' && file !== '') files.add(file);
+      if (typeof file === 'string' && file !== '') files.add(key(file));
     } catch {
       // 壊れた meta.json は index.ts 側がエラーにする。ここでは無視して先へ進む
     }
@@ -58,22 +73,37 @@ export function findPending(ignoreSkipped = false): PendingNote[] {
   const state = loadState();
   const notes: PendingNote[] = [];
 
-  for (const entry of fs.readdirSync(VAULT_DIR, { withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    if (entry.name.startsWith('.')) continue;
-    if (!entry.name.endsWith('.md')) continue;
-    if (entry.name === VAULT_INDEX_NOTE) continue;
-    if (imported.has(entry.name)) continue;
+  // フォルダ（Q&A / テクニック / 知識）の中まで見る。
+  // 新しいフォルダが増えても、こちらを直さずに拾えるようにする
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.')) continue;
+      const full = path.join(dir, entry.name);
 
-    const full = path.join(VAULT_DIR, entry.name);
-    const stat = fs.statSync(full);
+      if (entry.isDirectory()) {
+        if (VAULT_IGNORED_DIRS.has(entry.name)) continue;
+        walk(full);
+        continue;
+      }
 
-    // 見送り済みで、その後 md に手が入っていないものは候補から外す
-    const skipped = state.skipped[entry.name];
-    if (!ignoreSkipped && skipped !== undefined && skipped.mtimeMs === stat.mtimeMs) continue;
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.md')) continue;
+      if (entry.name.endsWith(VAULT_INDEX_SUFFIX)) continue;
 
-    notes.push({ file: entry.name, path: full, mtimeMs: stat.mtimeMs, size: stat.size });
-  }
+      const relative = path.relative(VAULT_DIR, full);
+      if (imported.has(key(relative))) continue;
+
+      const stat = fs.statSync(full);
+
+      // 見送り済みで、その後 md に手が入っていないものは候補から外す
+      const skipped = state.skipped[relative] ?? state.skipped[key(relative)];
+      if (!ignoreSkipped && skipped !== undefined && skipped.mtimeMs === stat.mtimeMs) continue;
+
+      notes.push({ file: relative, path: full, mtimeMs: stat.mtimeMs, size: stat.size });
+    }
+  };
+
+  walk(VAULT_DIR);
 
   // 古いものから。作られた順に取り込むほうが、一覧の並びが自然になる
   notes.sort((a, b) => a.mtimeMs - b.mtimeMs);

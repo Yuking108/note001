@@ -4,8 +4,9 @@ Obsidian に増えたノートを、毎日 0:10 に自動でページ化して p
 設計書 §8 の取り込み工程を、人の手を介さずに回す版。
 **Q&A に限らない**（手順メモ・調査メモ・早見表も対象。§3 を参照）。
 
-- 対象: `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/yuki_1/Blender/*.md`
-- 除外: `Q&A まとめ.md`（各ノートへの索引であって、ページにする中身ではない）
+- 対象: `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/yuki_1/Blender/` 配下の md（**フォルダの中まで再帰的に見る**）
+- 除外: `*まとめ.md`（各フォルダの索引）/ `assets/`・`.obsidian/`・`.trash/`
+- 原文は取り込み元のフォルダ構成のまま `docs/` に写す（`docs/Q&A/Q&A_xxx.md`）
 - 実行: launchd（`com.yuking108.note001.daily-import`）
 - ログ: `~/Library/Logs/note001-import.log`
 
@@ -38,21 +39,35 @@ launchd 0:10
 
 ## 2. ページ化済みの判定
 
-`content/pages/<slug>/meta.json` の **`source.file`** が唯一の鍵。
+`content/pages/<slug>/meta.json` の **`source.file`** が唯一の鍵。**取り込み元からの相対パス**で持つ。
 
 ```json
 "source": {
   "kind": "claude-code",
-  "file": "Q&A_レンダリングの時刻予約.md",
-  "note": "docs/Q&A_レンダリングの時刻予約.md を夜間取り込みでページ化したもの"
+  "file": "Q&A/Q&A_レンダリングの時刻予約.md",
+  "note": "docs/Q&A/Q&A_レンダリングの時刻予約.md を夜間取り込みでページ化したもの"
 }
 ```
 
 人が読む `note` と違い、`file` は書式を崩さないこと。ここが崩れると同じ md が二重にページ化される。
+比較は NFC に正規化してから行うので、濁点の表現（NFC / NFD）の違いは吸収される。
 
-## 3. tags とノートの種類
+## 3. フォルダ・tags とノートの種類
 
-ファイル名の接頭辞（`Q&A_` など）では判断しない。**frontmatter の `tags` と本文**で決める。
+取り込み元は用途ごとに3つのフォルダに分かれている。これは**本人が書いた時点で決めた分類**なので、
+tags と並ぶ強い手掛かりとして扱う。
+
+| フォルダ | 中身 | 対応するサブラベル | noteKind の目安 |
+|---|---|---|---|
+| `Q&A/` | 疑問とその答え（`Q&A_`） | `Blender/Q&A` | `qa` |
+| `テクニック/` | 手順・ワークフロー・効率化（`TIPS_`） | `Blender/テクニック` | `howto` |
+| `知識/` | 仕組み・概念・用語など「理解」（`KNOW_`） | `Blender/知識` | `research` / `reference` |
+
+この3つのサブラベルは**互いに排他**（1ページに1つだけ）。メインラベルは従来通り**題材**で決める
+（テクニックだから、知識だから、で変わらない）。フォルダが増えても取り込みは動くが、
+対応するラベルは自動では作らない（新規ラベルの追加は本人の判断）。
+
+残りの判断材料は **frontmatter の `tags` と本文**。ファイル名の接頭辞だけでは判断しない。
 
 **tags は「本人が書いた時点で付けた分類の意図」**として、最も強い手掛かりに使う。
 レジストリ側が `aliases` と大文字小文字を吸収するので、`modeling` → `Blender/モデリング`、
@@ -95,7 +110,7 @@ noteKind は `meta.json` には残さない（ページの見た目に効くだ�
 
 ```bash
 npx tsx scripts/import-state.ts list          # 見送り中の一覧と理由
-npx tsx scripts/import-state.ts clear "Q&A_xxx.md"   # 個別に解除
+npx tsx scripts/import-state.ts clear "Q&A/Q&A_xxx.md"   # 個別に解除
 ```
 
 サブラベルは**既存レジストリから選ぶだけ**で、新規ラベルは作らせていない。

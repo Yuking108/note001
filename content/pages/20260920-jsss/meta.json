@@ -13,7 +13,7 @@
   "links": [],
   "source": {
     "kind": "claude-code",
-    "file": "Q&A_マテリアルのバンプ設定.md",
-    "note": "docs/Q&A_マテリアルのバンプ設定.md をページ化したもの"
+    "file": "Q&A/Q&A_マテリアルのバンプ設定.md",
+    "note": "docs/Q&A/Q&A_マテリアルのバンプ設定.md をページ化したもの"
   }
 }

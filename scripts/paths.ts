@@ -26,8 +26,25 @@ export const VAULT_DIR =
     'Library/Mobile Documents/iCloud~md~obsidian/Documents/yuki_1/Blender',
   );
 
-/** 各ノートへの索引。それ自体はページにしない */
-export const VAULT_INDEX_NOTE = 'Q&A まとめ.md';
+/**
+ * 取り込み元の中のフォルダ（`Q&A` / `テクニック` / `知識`）。
+ * 本人がノートを書き分けている単位であり、分類の手掛かりとして扱う。
+ * ここに無いフォルダが増えても取り込みは動く（`VAULT_IGNORED_DIRS` 以外は全部見る）。
+ */
+export const VAULT_FOLDER_HINTS: Record<string, string> = {
+  'Q&A': '疑問とその答え。作業中に詰まった点の記録（Q&A_）',
+  テクニック: '手順・ワークフロー・効率化のテクニック（TIPS_）',
+  知識: '仕組み・概念・用語など「理解」にあたる内容（KNOW_）',
+};
+
+/** 取り込み対象外のフォルダ。画像などノート本文ではないもの */
+export const VAULT_IGNORED_DIRS = new Set(['assets', '.obsidian', '.trash']);
+
+/**
+ * 各フォルダの索引ノート（`Q&A まとめ.md` など）。
+ * 一覧であってページにする中身ではないので、末尾一致で除外する。
+ */
+export const VAULT_INDEX_SUFFIX = 'まとめ.md';
 
 /** 見送った md の台帳。git には入れない（判断の履歴であって、コンテンツではない） */
 export const IMPORT_STATE_FILE = path.join(ROOT, '.import-state.json');

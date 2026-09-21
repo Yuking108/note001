@@ -5,105 +5,166 @@
       "path": "Blender",
       "kind": "app",
       "description": "対象アプリの軸。第二階層は Blender 5.2 LTS Manual のサイドバー準拠。これ自体はメインラベルにできない（メインは必ず2段）",
-      "aliases": ["blender3d"]
+      "aliases": [
+        "blender3d"
+      ]
     },
     {
       "path": "Blender/Q&A",
       "section": false,
       "description": "疑問とその答えの形で書かれた Blender のページ。作業中に詰まった点の記録。公式ドキュメントのセクションではないのでメインラベルにはできない（サブラベル専用）",
-      "aliases": ["QandA", "QA"]
+      "aliases": [
+        "QandA",
+        "QA"
+      ]
+    },
+    {
+      "path": "Blender/テクニック",
+      "section": false,
+      "description": "手順・ワークフロー・効率化のテクニックとして書かれた Blender のページ。Obsidian の テクニック フォルダ（TIPS_）に対応する。公式ドキュメントのセクションではないのでメインラベルにはできない（サブラベル専用）",
+      "aliases": [
+        "technique",
+        "TIPS",
+        "tips"
+      ]
+    },
+    {
+      "path": "Blender/知識",
+      "section": false,
+      "description": "仕組み・概念・用語など「理解」にあたる Blender のページ。Obsidian の 知識 フォルダ（KNOW_）に対応する。公式ドキュメントのセクションではないのでメインラベルにはできない（サブラベル専用）",
+      "aliases": [
+        "knowledge",
+        "KNOW",
+        "know"
+      ]
     },
     {
       "path": "Blender/ユーザーインターフェース",
       "description": "ウィンドウ・エリア・パネル・操作系など、Blender の UI そのものの仕組み（公式 User Interface）",
-      "aliases": ["User Interface"]
+      "aliases": [
+        "User Interface"
+      ]
     },
     {
       "path": "Blender/エディター",
       "description": "3Dビューポート・アウトライナー・プロパティなど、各エディターの機能とツールバー（公式 Editors）",
-      "aliases": ["Editors"]
+      "aliases": [
+        "Editors"
+      ]
     },
     {
       "path": "Blender/シーンとオブジェクト",
       "description": "オブジェクトの変形・親子付け・コレクション・シーン構成（公式 Scenes & Objects）",
-      "aliases": ["Scenes & Objects"]
+      "aliases": [
+        "Scenes & Objects"
+      ]
     },
     {
       "path": "Blender/モデリング",
       "description": "メッシュ編集・モディファイア・カーブ・選択・シェーディング指定など形状を作る作業全般（公式 Modeling）",
-      "aliases": ["Modeling"]
+      "aliases": [
+        "Modeling"
+      ]
     },
     {
       "path": "Blender/モデリング/ベベル",
       "description": "ベベル（Ctrl+B）とベベルモディファイア、ベベルウェイト。モデリングの3段目サブラベル",
-      "aliases": ["bevel"]
+      "aliases": [
+        "bevel"
+      ]
     },
     {
       "path": "Blender/スカルプトとペイント",
       "description": "スカルプトモード、テクスチャペイント、頂点ペイント、ウェイトペイント（公式 Sculpting & Painting）",
-      "aliases": ["Sculpting & Painting"]
+      "aliases": [
+        "Sculpting & Painting"
+      ]
     },
     {
       "path": "Blender/グリースペンシル",
       "description": "グリースペンシルによる2D描画とアニメーション（公式 Grease Pencil）",
-      "aliases": ["Grease Pencil"]
+      "aliases": [
+        "Grease Pencil"
+      ]
     },
     {
       "path": "Blender/アニメーションとリギング",
       "description": "キーフレーム・ドライバー・アーマチュア・コンストレイント（公式 Animation & Rigging）",
-      "aliases": ["Animation & Rigging"]
+      "aliases": [
+        "Animation & Rigging"
+      ]
     },
     {
       "path": "Blender/物理演算",
       "description": "流体・剛体・クロス・パーティクル・ソフトボディなどのシミュレーション（公式 Physics）",
-      "aliases": ["Physics"]
+      "aliases": [
+        "Physics"
+      ]
     },
     {
       "path": "Blender/レンダリング",
       "description": "Cycles / EEVEE、マテリアルとシェーダー、ライト、ワールド、カラーマネジメント（公式 Rendering）",
-      "aliases": ["Rendering"]
+      "aliases": [
+        "Rendering"
+      ]
     },
     {
       "path": "Blender/コンポジティング",
       "description": "コンポジターのノードとレンダーパスの合成（公式 Compositing）",
-      "aliases": ["Compositing"]
+      "aliases": [
+        "Compositing"
+      ]
     },
     {
       "path": "Blender/モーショントラッキング",
       "description": "カメラトラッキング、オブジェクトトラッキング、マスク（公式 Motion Tracking & Masking）",
-      "aliases": ["Motion Tracking & Masking"]
+      "aliases": [
+        "Motion Tracking & Masking"
+      ]
     },
     {
       "path": "Blender/ビデオ編集",
       "description": "ビデオシーケンサーでの編集・表示設定・書き出し（公式 Video Editing）",
-      "aliases": ["Video Editing"]
+      "aliases": [
+        "Video Editing"
+      ]
     },
     {
       "path": "Blender/ファイルとデータ",
       "description": "ファイル入出力、アセットライブラリ、リンク / アペンド、データブロック管理（公式 Assets, Files, & Data System。別名はカンマを使えないため除いて登録）",
-      "aliases": ["Assets Files & Data System"]
+      "aliases": [
+        "Assets Files & Data System"
+      ]
     },
     {
       "path": "Blender/アドオン",
       "description": "同梱および外部アドオンの導入と使い方（公式 Add-ons）",
-      "aliases": ["Add-ons"]
+      "aliases": [
+        "Add-ons"
+      ]
     },
     {
       "path": "Blender/高度な設定",
       "description": "Python スクリプティング、コマンドライン、環境変数などの上級設定（公式 Advanced）",
-      "aliases": ["Advanced"]
+      "aliases": [
+        "Advanced"
+      ]
     },
     {
       "path": "Blender/トラブルシューティング",
       "description": "機能に紐づかない不具合（起動しない・クラッシュする・GPU が認識されない等）。機能に紐づく不具合はその機能のセクションへ（公式 Troubleshooting）",
-      "aliases": ["Troubleshooting"]
+      "aliases": [
+        "Troubleshooting"
+      ]
     },
-
     {
       "path": "After Effects",
       "kind": "app",
       "description": "対象アプリの軸。第二階層は After Effects ユーザーガイドのサイドバーを、知識ページの置き場として機能する粒度に統合したもの。これ自体はメインラベルにできない",
-      "aliases": ["AE", "aftereffects"]
+      "aliases": [
+        "AE",
+        "aftereffects"
+      ]
     },
     {
       "path": "After Effects/インターフェース",
