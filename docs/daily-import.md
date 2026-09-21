@@ -1,7 +1,8 @@
 # 夜間取り込み
 
-Obsidian に増えた Q&A ノートを、毎日 0:10 に自動でページ化して push する仕組み。
+Obsidian に増えたノートを、毎日 0:10 に自動でページ化して push する仕組み。
 設計書 §8 の取り込み工程を、人の手を介さずに回す版。
+**Q&A に限らない**（手順メモ・調査メモ・早見表も対象。§3 を参照）。
 
 - 対象: `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/yuki_1/Blender/*.md`
 - 除外: `Q&A まとめ.md`（各ノートへの索引であって、ページにする中身ではない）
@@ -22,7 +23,8 @@ launchd 0:10
       │
       └ md ごとに:
           ├ docs/ に原文をコピー
-          ├ claude -p（読むだけ）  title / mainLabel / subLabels / summary を決める
+          ├ claude -p（読むだけ）  tags と本文から title / mainLabel / subLabels /
+          │                        noteKind / summary を決める
           │                        決めきれなければ **見送り**
           ├ npm run new            器を作る（ラベルの実在チェックはここ）
           ├ meta.json              summary と source を機械的に書く
@@ -48,7 +50,38 @@ launchd 0:10
 
 人が読む `note` と違い、`file` は書式を崩さないこと。ここが崩れると同じ md が二重にページ化される。
 
-## 3. 見送り（skip）
+## 3. tags とノートの種類
+
+ファイル名の接頭辞（`Q&A_` など）では判断しない。**frontmatter の `tags` と本文**で決める。
+
+**tags は「本人が書いた時点で付けた分類の意図」**として、最も強い手掛かりに使う。
+レジストリ側が `aliases` と大文字小文字を吸収するので、`modeling` → `Blender/モデリング`、
+`QandA` → `Blender/Q&A`、`AE` → `After Effects` のように素直に当たる。
+
+| tags の状況 | 扱い |
+|---|---|
+| レジストリに当たる | そのままラベルに採用 |
+| 近い既存ラベルがある（`geometry-nodes` など） | 意味の近いラベルに寄せる |
+| 寄せ先が無い（`shortcut` など） | **落とす**（新規ラベルは作らない） |
+| tags と本文が食い違う | **本文を優先**（付け忘れ・使い回しがあるため） |
+| tags が無い | 本文だけで判断 |
+| 未登録のアプリ（`Photoshop` など） | mainLabel を決められないので**見送り** |
+
+`Blender/Q&A` は「疑問とその答え」の形のノートにだけ付く。手順メモや早見表には付けない。
+
+あわせて **noteKind**（`qa` / `howto` / `research` / `reference` / `other`）を判定し、本文の構成に反映する。
+
+| noteKind | 本文の組み立て |
+|---|---|
+| `qa` | 結論 → 切り分けの順に原因 → 操作手順 |
+| `howto` | 何ができるか → 前提 → 番号付きの手順 → つまずく点 |
+| `research` | 結論 → 比較表 → 判断の根拠 → 保留した選択肢 |
+| `reference` | 引く対象を前に（表・定義リスト中心）。読み物にしない |
+| `other` | 原文の構造を尊重しつつ結論を先頭に |
+
+noteKind は `meta.json` には残さない（ページの見た目に効くだけで、分類の軸ではないため）。
+
+## 4. 見送り（skip）
 
 無人実行では **メインラベルの確定に自信が持てないものを作らない**。次のときは見送る。
 
@@ -68,7 +101,7 @@ npx tsx scripts/import-state.ts clear "Q&A_xxx.md"   # 個別に解除
 サブラベルは**既存レジストリから選ぶだけ**で、新規ラベルは作らせていない。
 3段目のラベルを増やすのは本人の判断（設計書 §8.1 の手順4）なので、そこは自動化の対象外。
 
-## 4. 失敗したとき何が残るか
+## 5. 失敗したとき何が残るか
 
 | 状況 | リポジトリの状態 | 通知 |
 |---|---|---|
@@ -83,7 +116,7 @@ npx tsx scripts/import-state.ts clear "Q&A_xxx.md"   # 個別に解除
 tail -50 ~/Library/Logs/note001-import.log
 ```
 
-## 5. 手で動かす
+## 6. 手で動かす
 
 ```bash
 npm run pending                  # 取り込み対象を確認するだけ
@@ -93,7 +126,7 @@ npm run import                   # 本番と同じ
 npm run import -- --all          # 見送り台帳を無視
 ```
 
-## 6. 設定
+## 7. 設定
 
 環境変数で差し替えられる。既定値は `scripts/import-daily.sh` の先頭。
 
@@ -106,7 +139,7 @@ npm run import -- --all          # 見送り台帳を無視
 | `NOTE001_WRITE_TIMEOUT` | `1800` | 執筆の制限時間（秒） |
 | `NOTE001_BRANCH` | `main` | 対象ブランチ（検証用） |
 
-## 7. launchd
+## 8. launchd
 
 ```bash
 # 登録
@@ -123,7 +156,7 @@ launchctl print gui/$(id -u)/com.yuking108.note001.daily-import | head -20
 launchctl bootout gui/$(id -u)/com.yuking108.note001.daily-import
 ```
 
-## 8. 前提と限界
+## 9. 前提と限界
 
 - **Mac が動いていること。** スリープ中に 0:10 を迎えた場合は起床時に走る。電源が落ちていた間は走らない。
   毎晩必ず走らせたいなら `sudo pmset repeat wake MTWRFSU 00:05:00` で起こす。

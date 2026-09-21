@@ -16,6 +16,11 @@
       "items": { "type": "string" },
       "description": "既存レジストリにあるラベルのみ。0件以上"
     },
+    "noteKind": {
+      "type": "string",
+      "enum": ["qa", "howto", "research", "reference", "other"],
+      "description": "ノートの書き方。本文の構成を決めるために使う。decision が create のとき必須"
+    },
     "summary": { "type": "string", "description": "1〜2文。一覧に出る要約" },
     "reason": { "type": "string", "description": "その判断にした理由。skip のときは何が決められなかったか" }
   },

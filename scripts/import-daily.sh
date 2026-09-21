@@ -200,6 +200,7 @@ while IFS= read -r md_file; do
   title="$(jq -r '.structured_output.title // ""' "$TMP_DIR/classify.json")"
   main_label="$(jq -r '.structured_output.mainLabel // ""' "$TMP_DIR/classify.json")"
   summary="$(jq -r '.structured_output.summary // ""' "$TMP_DIR/classify.json")"
+  note_kind="$(jq -r '.structured_output.noteKind // "other"' "$TMP_DIR/classify.json")"
 
   sub_args=""
   while IFS= read -r sub; do
@@ -213,7 +214,7 @@ while IFS= read -r md_file; do
     rollback; skipped=$((skipped + 1)); continue
   fi
 
-  log "分類: $title / $main_label / $(echo "$sub_args" | grep -v '^--sub$' | tr '\n' ' ')"
+  log "分類: $title / $main_label / [$note_kind] / $(echo "$sub_args" | grep -v '^--sub$' | tr '\n' ' ')"
 
   # 2. 器を作る（ラベルが実在するかは new-page.ts が判定する）
   #    引数は改行区切りで組み立て、IFS を改行に切り替えて渡す（bash 3.2 での配列の取り回しを避ける）
@@ -245,7 +246,8 @@ while IFS= read -r md_file; do
 
   # 4. 本文を書く
   prompt="$(render scripts/import/write-prompt.md \
-    MD_FILE "$md_file" SLUG "$slug" REFERENCE_SLUG "$reference_slug" TITLE "$title")"
+    MD_FILE "$md_file" SLUG "$slug" REFERENCE_SLUG "$reference_slug" TITLE "$title" \
+    NOTE_KIND "$note_kind")"
   if ! run_claude "$TMP_DIR/write.json" "$WRITE_TIMEOUT" \
     -p "$prompt" \
     --model "$MODEL" \
