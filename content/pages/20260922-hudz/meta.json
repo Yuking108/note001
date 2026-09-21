@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20260922-hudz",
+  "title": "テンキー1のあとに5を押さないと真横にならない",
+  "summary": "原因は「自動パース（Auto Perspective）」がオフになっていること。デフォルトはオンで、テンキー1だけでフロント・平行投影になる（プリファレンス > 視点の操作 で有効化。テンキー1/3/7は向き、5は投影方式の切り替えで役割が別）。",
+  "mainLabel": "Blender/エディター",
+  "subLabels": [
+    "Blender/Q&A"
+  ],
+  "createdAt": "2026-09-22",
+  "updatedAt": "2026-09-22",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A_テンキー1のあとに5を押さないと真横にならない.md",
+    "note": "docs/Q&A_テンキー1のあとに5を押さないと真横にならない.md を夜間取り込みでページ化したもの"
+  }
+}
