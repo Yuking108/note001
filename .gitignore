@@ -10,3 +10,6 @@ public/pages/
 
 .DS_Store
 .env*.local
+
+# 夜間取り込みの見送り台帳（判断の履歴であってコンテンツではない）
+.import-state.json

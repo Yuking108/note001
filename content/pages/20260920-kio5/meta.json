@@ -15,6 +15,7 @@
   ],
   "source": {
     "kind": "claude-code",
+    "file": "Q&A_コンポジターにノードの使用がない.md",
     "note": "docs/Q&A_コンポジターにノードの使用がない.md をページ化したもの"
   }
 }

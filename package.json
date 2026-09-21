@@ -6,6 +6,8 @@
   "scripts": {
     "new": "tsx scripts/new-page.ts",
     "index": "tsx scripts/build-index.ts",
+    "pending": "tsx scripts/pending.ts",
+    "import": "bash scripts/import-daily.sh",
     "dev": "npm run index && next dev",
     "build": "npm run index && next build",
     "start": "npx serve out",

@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>アニメーションのレンダリングを時刻予約したい</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、可否の対比（launchd / cron）だけ色を足す。
+         足した色は明色・暗色の両方に必ず定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --ok: #2f6f4f;
+        --ok-bg: #e6f0ea;
+        --ok-line: #b0cdbd;
+        --no: #a3402b;
+        --no-bg: #f8e8e4;
+        --no-line: #dfb5a9;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --ok: #71c79c;
+          --ok-bg: #16281f;
+          --ok-line: #2f5440;
+          --no: #e2907a;
+          --no-bg: #2c1a16;
+          --no-line: #58322a;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 1.1rem;
+      }
+      .eyebrow .dot {
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        white-space: nowrap;
+        font-weight: 700;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .question {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .question .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .question p {
+        margin: 0;
+        max-width: none;
+        font-size: 1.1rem;
+      }
+      .question .detail {
+        margin-top: 0.4rem;
+        font-size: 0.95rem;
+        color: var(--fg-muted);
+      }
+
+      /* 答えそのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 切り分け：やりたいことから方法へ落とす */
+      .triage {
+        list-style: none;
+        margin: 1.4rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        max-width: var(--measure);
+      }
+      .triage li {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.15rem;
+        padding: 0.75rem 0.95rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent-line);
+        border-radius: 6px;
+        line-height: 1.7;
+      }
+      .triage .want {
+        font-weight: 700;
+      }
+      .triage .goto {
+        font-size: 0.9rem;
+        color: var(--fg-muted);
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      .yes {
+        color: var(--ok);
+        font-weight: 700;
+      }
+      .no {
+        color: var(--no);
+        font-weight: 700;
+      }
+
+      figure.diagram {
+        max-width: 30rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .question,
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">
+          <span>Blender</span><span class="dot"></span> <span>Rendering</span
+          ><span class="dot"></span> <span>Add-on</span><span class="dot"></span>
+          <span>2026.09.21</span>
+        </div>
+        <h1>アニメーションのレンダリングを時刻予約したい</h1>
+        <p class="standfirst">
+          Blender 単体にスケジュール機能はないのが原因。「深夜2時から」を本当にやるなら、コマンドライン
+          <code>blender -b file.blend -a</code> を macOS の launchd に叩かせる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="question">
+        <span class="tag">Question</span>
+        <p>Blender でアニメーションのレンダリングの「予約」はできないの？</p>
+        <p class="detail">「深夜2時から自動でレンダリング開始」のような時刻指定の予約をしたい。</p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Answer</span>Blender 単体にスケジュール機能はない。やり方は3通り</h2>
+
+        <div class="verdict">
+          <span class="big">時刻指定の予約が本当にできるのは、コマンドライン + OS のスケジューラだけ。</span>
+          <p>アドオンは「順番待ち」、Flamenco は「複数マシンの分散」。目的が違うので最初に切り分ける。</p>
+        </div>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">方法</th>
+                <th scope="col">できること</th>
+                <th scope="col">向いている用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">レンダーキュー系アドオン</th>
+                <td>複数シーン / 複数 .blend を<strong>順番に</strong>処理</td>
+                <td>寝る前にまとめて流す</td>
+              </tr>
+              <tr>
+                <th scope="row">コマンドライン + macOS のスケジューラ</th>
+                <td><strong>時刻指定の予約</strong>が本当にできる</td>
+                <td>「深夜2時から」など</td>
+              </tr>
+              <tr>
+                <th scope="row">Flamenco</th>
+                <td>複数マシンでのジョブ管理・分散レンダリング</td>
+                <td>本格的なファーム運用</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>やりたいことから選ぶ</h3>
+        <ul class="triage">
+          <li>
+            <span class="want">時刻を指定して勝手に始めてほしい</span>
+            <span class="goto">→ 方法2。コマンドライン + launchd（唯一これができる）</span>
+          </li>
+          <li>
+            <span class="want">複数シーンを GUI で管理して順番に流したい</span>
+            <span class="goto">→ 方法1。RenderCue</span>
+          </li>
+          <li>
+            <span class="want">カメラごとに出し分けたい</span>
+            <span class="goto">→ 方法1。BLeQ</span>
+          </li>
+          <li>
+            <span class="want">複数の .blend をまとめたい</span>
+            <span class="goto">→ 方法1の Render Queque、またはコマンドラインの <code>for</code> ループ</span>
+          </li>
+          <li>
+            <span class="want">複数マシンに分散したい</span>
+            <span class="goto">→ 方法3。Flamenco</span>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Method 2</span>コマンドライン + スケジューラ（本当の予約・macOS）</h2>
+        <p>
+          これが本当の「予約」。Blender をバックグラウンド（<code>-b</code>）で起動してレンダリングさせる。
+        </p>
+
+        <h3>まず手動で動作確認</h3>
+        <pre><code>/Applications/Blender.app/Contents/MacOS/Blender -b "/path/to/file.blend" -a</code></pre>
+        <p>出力先やフォーマットを上書きしたい場合（<strong><code>-a</code> は必ず最後</strong>）:</p>
+        <pre><code>/Applications/Blender.app/Contents/MacOS/Blender -b "/path/to/file.blend" \
+  -o "/Users/theory/Desktop/render/frame_####" -F PNG -s 1 -e 250 -a</code></pre>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">オプション</th>
+                <th scope="col">意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><code>-b</code></th>
+                <td>バックグラウンド（GUI なし）。メモリを食わず速い</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-a</code></th>
+                <td>アニメーションをレンダリング</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-o</code></th>
+                <td>出力パス（<code>####</code> が連番に置換される）</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-F</code></th>
+                <td>フォーマット（PNG / OPEN_EXR / FFMPEG など）</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-s</code> / <code>-e</code></th>
+                <td>開始 / 終了フレーム</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-f 100</code></th>
+                <td>特定フレームだけ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>時刻で叩く側をどれにするか</h3>
+        <p>
+          レンダリングを走らせるコマンド自体は <code>blender -b file.blend -a</code>
+          一択で、これは全プラットフォーム共通。分かれるのは「時刻で叩く側」。
+        </p>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">方法</th>
+                <th scope="col">一般度</th>
+                <th scope="col">備考</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">launchd（LaunchAgent）</th>
+                <td><span class="yes">macOS ではこれが正解</span></td>
+                <td>
+                  Apple 公式の仕組み。スリープ中に時刻を過ぎても、<strong>復帰時に実行してくれる</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">cron（crontab）</th>
+                <td>チュートリアルで最もよく見る</td>
+                <td>
+                  昔から非推奨扱い。今も動くが、TCC（フルディスクアクセス）で詰まる・スリープ中の回はスキップされる
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">at</th>
+                <td>ほぼ使われない</td>
+                <td>macOS では <code>atrun</code> が既定で無効</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>sleep</code> + コマンド</th>
+                <td>今夜1回だけの時に便利</td>
+                <td>ターミナルを閉じると消える</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 380 136" role="img" aria-label="深夜2時にスリープしていた場合、cron はその回をスキップするが、launchd は復帰時に実行する">
+            <g font-family="ui-monospace, Menlo, monospace" font-size="9" fill="var(--fg-muted)">
+              <!-- 時間軸の目盛 -->
+              <text x="14" y="20">01:00</text>
+              <text x="150" y="20">02:00（予約時刻）</text>
+              <text x="296" y="20">08:00 復帰</text>
+
+              <!-- launchd -->
+              <text x="14" y="44" fill="var(--fg)" font-size="10">launchd</text>
+              <rect x="14" y="52" width="340" height="14" rx="3" fill="var(--code-bg)" />
+              <rect x="150" y="52" width="160" height="14" rx="3" fill="var(--ok-bg)" stroke="var(--ok-line)" />
+              <line x1="158" y1="46" x2="158" y2="72" stroke="var(--ok)" stroke-width="1.5" />
+              <circle cx="310" cy="59" r="4" fill="var(--ok)" />
+              <text x="320" y="63" fill="var(--ok)">実行</text>
+              <text x="166" y="63">スリープ中</text>
+
+              <!-- cron -->
+              <text x="14" y="92" fill="var(--fg)" font-size="10">cron</text>
+              <rect x="14" y="100" width="340" height="14" rx="3" fill="var(--code-bg)" />
+              <rect x="150" y="100" width="160" height="14" rx="3" fill="var(--no-bg)" stroke="var(--no-line)" />
+              <line x1="158" y1="94" x2="158" y2="120" stroke="var(--no)" stroke-width="1.5" />
+              <line x1="152" y1="103" x2="164" y2="111" stroke="var(--no)" stroke-width="1.5" />
+              <line x1="164" y1="103" x2="152" y2="111" stroke="var(--no)" stroke-width="1.5" />
+              <text x="170" y="111" fill="var(--no)">この回はスキップ</text>
+            </g>
+          </svg>
+          <figcaption>
+            2時にスリープしていたとき。launchd は復帰時に実行してくれるが、cron はその回が飛ぶ。
+          </figcaption>
+        </figure>
+
+        <p>
+          Blender のチュートリアルは Windows（タスクスケジューラ）か Linux（cron）前提のものが多いので
+          cron の記事をよく見かけるが、<strong>macOS で恒常運用するなら launchd</strong> が確実。
+        </p>
+
+        <h3>launchd での設定（推奨）</h3>
+        <ol class="steps">
+          <li><span><code>~/Library/LaunchAgents/com.yuki.blenderrender.plist</code> を作成する</span></li>
+          <li><span><code>launchctl bootstrap</code> で登録する</span></li>
+          <li><span><code>launchctl kickstart -k</code> で、時刻を待たずにテスト実行して確かめる</span></li>
+        </ol>
+
+        <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+  &lt;key&gt;Label&lt;/key&gt;&lt;string&gt;com.yuki.blenderrender&lt;/string&gt;
+  &lt;key&gt;ProgramArguments&lt;/key&gt;
+  &lt;array&gt;
+    &lt;string&gt;/usr/bin/caffeinate&lt;/string&gt;
+    &lt;string&gt;-i&lt;/string&gt;
+    &lt;string&gt;/Applications/Blender.app/Contents/MacOS/Blender&lt;/string&gt;
+    &lt;string&gt;-b&lt;/string&gt;
+    &lt;string&gt;/path/to/file.blend&lt;/string&gt;
+    &lt;string&gt;-a&lt;/string&gt;
+  &lt;/array&gt;
+  &lt;key&gt;StartCalendarInterval&lt;/key&gt;
+  &lt;dict&gt;
+    &lt;key&gt;Hour&lt;/key&gt;&lt;integer&gt;2&lt;/integer&gt;
+    &lt;key&gt;Minute&lt;/key&gt;&lt;integer&gt;0&lt;/integer&gt;
+  &lt;/dict&gt;
+  &lt;key&gt;StandardOutPath&lt;/key&gt;&lt;string&gt;/tmp/blender_render.log&lt;/string&gt;
+  &lt;key&gt;StandardErrorPath&lt;/key&gt;&lt;string&gt;/tmp/blender_render.err&lt;/string&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;</code></pre>
+
+        <p>登録・確認・解除:</p>
+        <pre><code># 登録
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.yuki.blenderrender.plist
+
+# 今すぐテスト実行（時刻を待たずに確認できる）
+launchctl kickstart -k gui/$(id -u)/com.yuki.blenderrender
+
+# 登録されているか確認
+launchctl list | grep blenderrender
+
+# 解除
+launchctl bootout gui/$(id -u)/com.yuki.blenderrender</code></pre>
+
+        <ul class="ticks">
+          <li>
+            LaunchAgent は<strong>ログイン中のユーザーセッションで動く</strong>。ログアウト状態でも動かしたいなら
+            <code>/Library/LaunchDaemons/</code> に置く（root 実行になるのでパスと権限に注意）
+          </li>
+          <li>plist を編集したら必ず <code>bootout</code> → <code>bootstrap</code> で入れ直す</li>
+          <li>
+            <code>ProgramArguments</code> は<strong>スペース区切りのコマンドではなく1要素ずつ配列にする</strong>。ここを間違えると静かに起動しない
+          </li>
+        </ul>
+
+        <h3>cron でやる場合（簡易版）</h3>
+        <p>手軽さ優先ならこちらでも動く。<code>crontab -e</code> で以下を追記（毎日深夜2時の例）:</p>
+        <pre><code>0 2 * * * /usr/bin/caffeinate -i /Applications/Blender.app/Contents/MacOS/Blender -b "/path/to/file.blend" -a &gt;&gt; ~/blender_render.log 2&gt;&amp;1</code></pre>
+        <ul class="ticks">
+          <li><code>caffeinate -i</code> を挟むと<strong>レンダリング中に Mac がスリープしない</strong></li>
+          <li><code>&gt;&gt; ~/blender_render.log 2&gt;&amp;1</code> でログが残るので、失敗しても原因を追える</li>
+        </ul>
+
+        <h3>今夜1回だけでいい場合</h3>
+        <p>ターミナルを開いたまま放置するだけ。指定時刻まで待って実行する:</p>
+        <pre><code>sleep $(( $(date -j -f "%Y-%m-%d %H:%M" "2026-09-22 02:00" +%s) - $(date +%s) )) &amp;&amp; \
+/usr/bin/caffeinate -i /Applications/Blender.app/Contents/MacOS/Blender -b "/path/to/file.blend" -a</code></pre>
+
+        <h3>複数ファイルを順番に</h3>
+        <pre><code>for f in ~/projects/*.blend; do
+  /usr/bin/caffeinate -i /Applications/Blender.app/Contents/MacOS/Blender -b "$f" -a
+done</code></pre>
+      </section>
+
+      <section>
+        <h2><span class="lead">Method 1</span>レンダーキュー系アドオン（順番待ち）</h2>
+        <p>
+          Blender Extensions プラットフォームから入る。時刻予約ではなく「キューに積んで順番に処理」する仕組み。インストールは
+          <code>編集 &gt; プリファレンス &gt; 拡張機能</code> から検索。
+        </p>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">アドオン</th>
+                <th scope="col">DL数</th>
+                <th scope="col">評価</th>
+                <th scope="col">最終更新</th>
+                <th scope="col">特徴</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">RenderCue</th>
+                <td>2,771</td>
+                <td>★4.0（2件）</td>
+                <td>2025-12-08 (v1.1.3)</td>
+                <td>
+                  最有力。複数シーンをキュー化、ジョブごとに設定上書き、<strong>バックグラウンド実行</strong>、Webhook
+                  通知、複数ファイルのリンクシーン対応。UI が固まらない
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">BLeQ</th>
+                <td>1,223</td>
+                <td>レビューなし</td>
+                <td>2026-02-07</td>
+                <td>
+                  シーン+<strong>カメラ</strong>の組み合わせで自動切替。マルチカメラ案件向け。欠損エントリを自動スキップ。別途スタンドアロンアプリ連携あり
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Render Queque</th>
+                <td>299</td>
+                <td>レビューなし</td>
+                <td>2026-07-28 (v0.4.1)</td>
+                <td>
+                  複数の <strong>.blend ファイル</strong>を最大30個まで順次処理。解像度プリセット、プレビューサムネイル。まだ新しく実績は少なめ
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          数値は 2026-09-21 時点の公式 Extensions の実績。いずれも Blender 4.2 LTS
+          以降対応。ほかに有料の <strong>Blender Queue</strong>（<code>blenderqueue.com</code>）もある。
+        </p>
+
+        <div class="note">
+          <p>
+            <strong>迷うなら RenderCue。</strong>DL 数が他の
+            2〜9倍で、バックグラウンド実行と通知まで揃っている。ただし正直なところ、3つとも数千 DL
+            規模のニッチなアドオンで「定番」と呼べるほど普及したものはない。<strong>コミュニティで一般的なのはむしろ方法2のコマンドライン</strong>で、こちらは壊れないし、そのまま時刻予約にもつなげられる。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Method 3</span>Flamenco（本格運用）</h2>
+        <p>
+          Blender Studio
+          公式のオープンソース・レンダーファームマネージャ。マネージャ + ワーカー構成でジョブをキュー管理し、複数マシンに分散できる。1台でもジョブ管理ツールとして使える。
+        </p>
+        <ul class="ticks">
+          <li>公式ブログ: <code>studio.blender.org/blog/scaling-render-power-with-flamenco-orchestra/</code></li>
+          <li>セルフホスト解説: <code>blog.cg-wire.com/self-hosted-blender-render-farm/</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Gotchas</span>macOS での注意点</h2>
+        <ul class="ticks">
+          <li>
+            <strong>スリープ対策</strong> — <code>caffeinate -i</code>
+            を必ず付ける。それでもディスプレイスリープからの復帰でこける場合は、<code>システム設定 &gt; ロック画面</code>
+            で自動スリープを切る
+          </li>
+          <li>
+            <strong>電源オフからの起動</strong> —
+            <code>sudo pmset repeat wakeorpoweron MTWRFSU 01:55:00</code>
+            で毎日 1:55 に自動起動させておくと、2時の cron が確実に走る
+          </li>
+          <li>
+            <strong>cron の権限</strong> — macOS では cron
+            から実行するプログラムに「フルディスクアクセス」が必要な場合がある。<code>システム設定 &gt; プライバシーとセキュリティ &gt; フルディスクアクセス</code>
+            に <code>/usr/sbin/cron</code> を追加する
+          </li>
+          <li><strong>パスに日本語やスペースが含まれる場合</strong>は必ずダブルクォートで囲む</li>
+        </ul>
+
+        <div class="note">
+          <p>
+            レンダリング中に PC を使いたいなら <code>-b</code> のバックグラウンドレンダリングが有利。GUI
+            を起動しないぶんメモリに余裕ができ、他の作業への影響も小さい。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

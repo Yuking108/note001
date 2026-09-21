@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  毎日 0:10 に夜間取り込みを走らせる。
+
+  インストール:
+    cp scripts/launchd/com.yuking108.note001.daily-import.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.yuking108.note001.daily-import.plist
+
+  停止:
+    launchctl bootout gui/$(id -u)/com.yuking108.note001.daily-import
+
+  リポジトリを別の場所に置いている場合は、下のパスを書き換えること。
+  0:00 ちょうどではなく 0:10 にしているのは、日付の境目で slug の日付とログの日付がずれるのを避けるため。
+  スリープ中に時刻を迎えた場合、launchd は**起床時に**実行する（電源が落ちていた間は走らない）。
+-->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.yuking108.note001.daily-import</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/bash</string>
+      <string>/Users/theory/dev/note001/scripts/import-daily.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/theory/dev/note001</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Hour</key>
+      <integer>0</integer>
+      <key>Minute</key>
+      <integer>10</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>LANG</key>
+      <string>ja_JP.UTF-8</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/theory/Library/Logs/note001-import.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/theory/Library/Logs/note001-import.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LowPriorityIO</key>
+    <true/>
+  </dict>
+</plist>

@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["create", "skip"],
+      "description": "ページ化するなら create、メインラベルを決めきれないなら skip"
+    },
+    "title": { "type": "string", "description": "ページのタイトル。decision が create のとき必須" },
+    "mainLabel": {
+      "type": "string",
+      "description": "`<アプリ>/<セクション>` のちょうど2段。decision が create のとき必須"
+    },
+    "subLabels": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "既存レジストリにあるラベルのみ。0件以上"
+    },
+    "summary": { "type": "string", "description": "1〜2文。一覧に出る要約" },
+    "reason": { "type": "string", "description": "その判断にした理由。skip のときは何が決められなかったか" }
+  },
+  "required": ["decision", "reason"]
+}

@@ -36,6 +36,12 @@ export type PageMeta = {
   links?: string[];
   source?: {
     kind: string;
+    /**
+     * 取り込み元の Obsidian ノートのファイル名（`Q&A_xxx.md`）。
+     * 夜間取り込み（docs/daily-import.md）が「この md はページ化済みか」を機械的に判定する唯一の鍵。
+     * 人が読む `note` と違い、書式を崩さないこと。
+     */
+    file?: string;
     note?: string;
   };
 };

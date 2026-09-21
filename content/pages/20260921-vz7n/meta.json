@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "20260921-vz7n",
+  "title": "アニメーションのレンダリングを時刻予約したい",
+  "summary": "Blender 単体にスケジュール機能はなく、「深夜2時から」のような時刻予約が本当にできるのはコマンドライン（`blender -b file.blend -a`）を macOS の launchd で叩く方法だけ。レンダーキュー系アドオン（RenderCue ほか）は順番待ち、Flamenco は複数マシンでの分散運用向けという住み分け。",
+  "mainLabel": "Blender/高度な設定",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/レンダリング",
+    "Blender/アドオン"
+  ],
+  "createdAt": "2026-09-21",
+  "updatedAt": "2026-09-21",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A_レンダリングの時刻予約.md",
+    "note": "docs/Q&A_レンダリングの時刻予約.md を夜間取り込みでページ化したもの"
+  }
+}
