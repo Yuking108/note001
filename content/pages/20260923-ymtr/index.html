@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>流体シミュレーションの3つの役割（ドメイン・フロー・エフェクター）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・表の強調・SVG 図の面塗りだけ
+         色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+        --accent-fill: #eeddd0;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+          --accent-fill: #3a2a1d;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      tr.pick th,
+      tr.pick td {
+        background: var(--accent-bg);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card ul.ticks,
+      .card ol.steps {
+        margin: 0.6rem 0 0;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      figure.diagram {
+        max-width: 32rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>流体シミュレーションの3つの役割（ドメイン・フロー・エフェクター）</h1>
+        <p class="standfirst">
+          Blender の流体シミュレーション（Mantaflow）に「流体シミュレーションという機能」はない。<strong>オブジェクトに役割を割り当て、その関係で組み立てる</strong>。割り当ては <code>物理演算プロパティ</code> &gt; <code>流体</code> &gt; <code>タイプ</code> から、<code>なし</code> / <code>ドメイン</code> / <code>フロー</code> / <code>エフェクター</code> を選ぶ。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >ドメイン＝<strong>水槽</strong>（計算する範囲）、フロー＝<strong>蛇口</strong>（流体を出すもの）、エフェクター＝<strong>障害物</strong>（流体がぶつかるもの）。</span
+        >
+        <p>
+          フローもエフェクターも、<strong>ドメインの内側に入っていないと無視される</strong>。初期値はドメインもフローも<strong>ガス／煙</strong>なので、水をやるなら両方を変更する。そして<strong>設定しただけでは動かない。ベイクが必要</strong>。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Roles</span>3つの役割</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">役割</th>
+                <th scope="col">たとえ</th>
+                <th scope="col">ひとことで</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ドメイン</th>
+                <td>水槽</td>
+                <td>計算する<strong>範囲</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">フロー</th>
+                <td>蛇口</td>
+                <td>流体を<strong>出すもの</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">エフェクター</th>
+                <td>障害物</td>
+                <td>流体が<strong>ぶつかるもの</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 420 246"
+            role="img"
+            aria-label="ドメインの箱の中に、上部にフローの発生点があり、そこから下向きに流体が落ちて、下部のエフェクターの板にぶつかる。ドメインの箱の外に置かれたオブジェクトは、フローでもエフェクターでも無視される"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10" fill="var(--fg)">
+              <text x="20" y="16" fill="var(--accent-ink)" font-weight="700">
+                ドメイン ＝ この箱の中だけが計算される
+              </text>
+
+              <!-- ドメインの箱 -->
+              <rect
+                x="20"
+                y="26"
+                width="280"
+                height="180"
+                rx="6"
+                fill="var(--accent-bg)"
+                stroke="var(--accent-line)"
+                stroke-dasharray="5 4"
+              />
+
+              <!-- フロー -->
+              <circle cx="92" cy="62" r="7" fill="var(--accent)" />
+              <text x="108" y="66">フロー ＝ ここから湧く</text>
+
+              <!-- 落下 -->
+              <line x1="92" y1="74" x2="92" y2="142" stroke="var(--accent)" />
+              <polygon points="92,150 87,140 97,140" fill="var(--accent)" />
+
+              <!-- エフェクター -->
+              <rect
+                x="46"
+                y="158"
+                width="140"
+                height="14"
+                rx="3"
+                fill="var(--accent-fill)"
+                stroke="var(--accent-line)"
+              />
+              <text x="46" y="192">エフェクター ＝ ぶつかる・溜まる</text>
+
+              <!-- 箱の外 -->
+              <rect
+                x="334"
+                y="100"
+                width="30"
+                height="24"
+                rx="3"
+                fill="none"
+                stroke="var(--fg-muted)"
+                stroke-dasharray="3 3"
+              />
+              <text x="312" y="146" fill="var(--fg-muted)">箱の外に</text>
+              <text x="312" y="162" fill="var(--fg-muted)">あるものは</text>
+              <text x="312" y="178" fill="var(--fg-muted)">無視される</text>
+            </g>
+          </svg>
+          <figcaption>
+            フローもエフェクターも、<strong>ドメインの中に入っていないと無視される</strong>。外に出た流体も消える。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Domain</span>ドメイン ＝ 水槽</h2>
+        <p>
+          シミュレーションが計算される<strong>範囲そのもの</strong>。この箱の内側でしか流体は計算されず、外に出た流体は消える。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">設定</th>
+                <th scope="col">中身</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="pick">
+                <th scope="row">ドメインタイプ</th>
+                <td>
+                  <code>ガス</code>（煙・炎）/ <code>液体</code>（水）。<strong>初期値はガス</strong>なので、水をやるなら必ず変更する
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">解像度<br />（Resolution Divisions）</th>
+                <td>箱を何分割して計算するか。上げるほどディテールが出るが、急激に重くなる</td>
+              </tr>
+              <tr>
+                <th scope="row">キャッシュ</th>
+                <td>計算結果の保存先（＝ベイク）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <p>
+            ドメインは<strong>流体が通る範囲ギリギリまで小さく</strong>する。無駄に大きいと、同じ解像度でも1マスあたりが大きくなるため、<strong>ディテールが落ちたうえに重い</strong>という一番損な状態になる。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Flow</span>フロー ＝ 蛇口</h2>
+        <p>
+          流体を<strong>発生させるもの</strong>。フロータイプは <code>煙</code> / <code>炎</code> / <code>煙+炎</code> / <code>液体</code> で、<strong>初期値は煙</strong>。ここも水なら変更が必要。
+        </p>
+
+        <h3>フローの挙動（Flow Behavior）</h3>
+        <p>3種類あり、性格がまったく違う。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">挙動</th>
+                <th scope="col">動作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">流入口<br />（Inflow）</th>
+                <td>蛇口。止めるまで流体を出し続ける</td>
+              </tr>
+              <tr>
+                <th scope="row">流出口<br />（Outflow）</th>
+                <td>排水口。入ってきた流体を消す</td>
+              </tr>
+              <tr>
+                <th scope="row">ジオメトリ<br />（Geometry）</th>
+                <td>
+                  <strong>オブジェクトの形がそのまま最初から液体になる</strong>。一塊の水を落としたいとき
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>「オブジェクトの形は関係ない」の正確なところ</h3>
+        <p><strong>挙動によって答えが変わる</strong>ので、ここは分けて覚える。</p>
+        <ul class="ticks">
+          <li>
+            <strong>流入口なら、ほぼ正しい</strong> … 球でも立方体でも「そこから水が湧く」だけ。<strong>凝った蛇口をモデリングする必要はない</strong>。フロー用オブジェクト自体は絵に出さない（レンダリングでは非表示にする）のが普通なので、見た目も問われない
+          </li>
+          <li>
+            <strong>ジオメトリなら、大いに関係する</strong> … オブジェクトの形がそのまま液体の初期形状になる
+          </li>
+          <li>
+            厳密には流入口でも、<strong>流体はメッシュの表面から発生する</strong>ので、<strong>大きさと位置は結果に効く</strong>。また法線の向きが初速の方向に影響する（初速を一方向に揃えたいなら法線を揃える必要がある）
+          </li>
+          <li>
+            <strong>表面からの発生距離（Surface Emission）</strong> … メッシュ表面から何ボクセル分の範囲で流体を発生させるかの設定。<strong>0だと発生範囲が実質ゼロ</strong>になる
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Effector</span>エフェクター ＝ 障害物</h2>
+        <p>
+          流体と<strong>ぶつかるもの</strong>。<strong>設定しないと、流体はそのオブジェクトを素通りする</strong>——シミュレーターから見て、エフェクターでないオブジェクトは<strong>存在しないのと同じ</strong>扱いになる。
+        </p>
+        <p>
+          コップ・ボトル・床・壁など、流体を受け止めたいものには必ず設定する。「コップに水が注がれず、床を突き抜けていく」の原因はたいていこれ。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">設定</th>
+                <th scope="col">中身</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="pick">
+                <th scope="row">コリジョン<br />（Collision）</th>
+                <td>エフェクタータイプ。ぶつかって流れを堰き止める。<strong>通常はこれ</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">ガイド<br />（Guide）</th>
+                <td>
+                  エフェクタータイプ。オブジェクトの<strong>速度</strong>で流体の流れを誘導する。<strong>動いていないと効かない</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">表面の厚さ<br />（Surface Thickness）</th>
+                <td>衝突判定を外側に膨らませる。薄いメッシュで流体が漏れるときに上げる</td>
+              </tr>
+              <tr>
+                <th scope="row">平面<br />（Is Planar）</th>
+                <td>
+                  平面や閉じていないメッシュに使うフラグ。閉じたメッシュでも、内部の体積から流体が湧くのを防ぐために使える
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Gotchas</span>忘れやすい前提</h2>
+        <div class="card">
+          <span class="tag">動かないときの見直し順</span>
+          <ol class="steps">
+            <li>
+              <strong>フローもエフェクターも、ドメインの内側に入っているか</strong>。外にあるものは無視される
+            </li>
+            <li>
+              <strong>初期値はガス／煙</strong>。液体をやるならドメインタイプとフロータイプの<strong>両方</strong>を変更する
+            </li>
+            <li><strong>設定しただけでは動かない。ベイクが必要</strong></li>
+          </ol>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
