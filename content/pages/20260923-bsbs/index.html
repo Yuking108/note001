@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cyclesのレンダリング設定を軽くする（ノイズしきい値・サンプル数・ルック）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・設定値の強調・SVG 図の
+         面塗りだけ色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+        --accent-fill: #eeddd0;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+          --accent-fill: #3a2a1d;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      td .was {
+        color: var(--fg-muted);
+        text-decoration: line-through;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card ul.ticks {
+        margin: 0.6rem 0 0;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      figure.diagram {
+        max-width: 30rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Cyclesのレンダリング設定を軽くする（ノイズしきい値・サンプル数・ルック）</h1>
+        <p class="standfirst">
+          レンダープロパティを3箇所だけ触る。ノイズしきい値 <code>0.03</code>、最大サンプル数 <code>512</code>、ルック「中から高コントラスト」。時間が大幅に縮んで、見た目はむしろ締まる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >しきい値 <code>0.01</code> → <code>0.03</code> で時間は理論上 約1/9。最大サンプル数 <code>512</code> は暴走を止めるブレーキ。ルックはAgXの眠さを消す後段処理。</span
+        >
+        <p>
+          主役はしきい値、<code>512</code> は保険、ルックは見た目の話。<strong>3つとも「デノイズON」が前提</strong>で、ここが外れると 0.03 はノイズが残る設定になる。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Settings</span>変える3箇所</h2>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">デフォルト</th>
+                <th scope="col">変更後</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ノイズしきい値（レンダー）</th>
+                <td><span class="was">0.01</span></td>
+                <td><strong>0.03</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">最大サンプル数（レンダー）</th>
+                <td><span class="was">4096</span></td>
+                <td><strong>512</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">カラーマネジメント &gt; ルック</th>
+                <td><span class="was">なし</span></td>
+                <td><strong>中から高コントラスト</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <span class="tag">前提</span>
+          <ul class="ticks">
+            <li><strong>デノイズがON</strong>であること。残ったノイズはデノイザーが均す前提の数値</li>
+            <li>
+              触るのは<strong>レンダー側だけ</strong>。ビューポート側（しきい値 <code>0.1</code> / 最大 <code>1024</code>）はデフォルトのまま
+            </li>
+            <li>ルックは Blender 4.0 以降のデフォルトのビュー変換 <strong>AgX</strong> が前提</li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Steps</span>手順</h2>
+        <ol class="steps">
+          <li><span>レンダープロパティ &gt; サンプリング &gt; <strong>レンダー</strong> を開く</span></li>
+          <li><span>ノイズしきい値を <code>0.03</code> に</span></li>
+          <li><span>最大サンプル数を <code>512</code> に</span></li>
+          <li>
+            <span><strong>デノイズにチェックが入っていることを確認</strong>（この設定はデノイズ前提）</span>
+          </li>
+          <li>
+            <span>レンダープロパティ &gt; <strong>カラーマネジメント</strong> &gt; ルック を「中から高コントラスト」に</span>
+          </li>
+          <li>
+            <span>アニメの場合は、サンプリング &gt; 詳細設定 で <strong>アニメーションシード</strong> をONにして短い区間をテスト</span>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why 1</span>しきい値を上げると速い理由</h2>
+        <p>
+          ノイズしきい値は Cycles の<strong>アダプティブサンプリング</strong>の停止基準。ピクセルごとにノイズ量を測り、しきい値を下回ったらそのピクセルのサンプリングを打ち切る。値が小さいほど「もっと綺麗になるまで粘る」＝遅い。
+        </p>
+        <p>
+          レンダリング時間はおおよそ <code>1 / ノイズ²</code> に比例する。<code>0.01</code> → <code>0.03</code>（3倍）なら理論上は <strong>約1/9</strong>。ノイズを半分にするには4倍の時間がかかる、という関係の裏返し。
+        </p>
+        <ul class="ticks">
+          <li>デフォルトの <code>0.01</code> は「たいていの場面で十分低い」値</li>
+          <li>テスト時は <code>0.1</code>〜<code>0.2</code> から入って、許容できるところまで下げていくのが効率的</li>
+          <li>下げるとしても <strong><code>0.004</code>〜<code>0.002</code> より低くしない</strong>（時間だけ爆発して見た目が変わらない）</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why 2</span>4096 は「上限」であって「目標」ではない</h2>
+        <p>
+          アダプティブサンプリングが効いていれば、ほとんどのピクセルはしきい値に到達して4096まで回らずに止まる。ではなぜ下げるのか——<strong>止まってくれない一部のピクセル</strong>があるから。ガラス・コースティクス・屋内のGI・強いボケなど、ノイズが落ちにくい領域は延々と4096までサンプルを積み、ここが時間を爆発させる。<code>512</code> で頭打ちにして、その暴走を止めるのが狙い。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 380 176"
+            role="img"
+            aria-label="サンプル数の軸。左端が最小サンプル数（0は自動）、途中でノイズしきい値が「もう十分」と判断して停止するのが大半のピクセル。右端の最大サンプル数512は、ノイズが残っていても強制停止させる上限"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="9" fill="var(--fg-muted)">
+              <!-- 大半のピクセルが停止する帯 -->
+              <rect x="22" y="58" width="128" height="22" fill="var(--accent-fill)" />
+              <!-- サンプル数の軸 -->
+              <line x1="22" y1="80" x2="358" y2="80" stroke="var(--border)" stroke-width="1" />
+              <line x1="22" y1="52" x2="22" y2="88" stroke="var(--fg-muted)" stroke-width="1" />
+              <line x1="358" y1="52" x2="358" y2="88" stroke="var(--accent)" stroke-width="1.5" />
+              <!-- しきい値による停止位置 -->
+              <line
+                x1="150"
+                y1="52"
+                x2="150"
+                y2="88"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+                stroke-dasharray="3 2"
+              />
+
+              <text x="22" y="46">最小サンプル数</text>
+              <text x="22" y="34" fill="var(--fg)">0（自動）</text>
+
+              <text x="150" y="46" fill="var(--accent)">しきい値 0.03 で停止</text>
+              <text x="150" y="34" fill="var(--fg)">大半のピクセル</text>
+
+              <text x="358" y="46" text-anchor="end" fill="var(--accent)">最大サンプル数</text>
+              <text x="358" y="34" text-anchor="end" fill="var(--fg)">512（強制停止）</text>
+
+              <text x="22" y="102">実際に使われるサンプル数 →</text>
+
+              <!-- 止まってくれないピクセル -->
+              <line
+                x1="22"
+                y1="130"
+                x2="358"
+                y2="130"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+              />
+              <polygon points="358,130 350,126 350,134" fill="var(--accent)" />
+              <text x="22" y="122" fill="var(--fg)">ガラス・コースティクス・GI・強いボケ</text>
+              <text x="22" y="148">しきい値に届かないまま 512 で打ち切られる。</text>
+              <text x="22" y="162">この上限が無いと 4096 まで積み続ける</text>
+            </g>
+          </svg>
+          <figcaption>
+            しきい値0.03なら大半のピクセルは512に届く前に止まる。<code>512</code> は「保険（キャップ）」として効く。主役はしきい値、512はブレーキ、という役割分担。
+          </figcaption>
+        </figure>
+
+        <h3>512 は妥当か</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">用途</th>
+                <th scope="col">推奨レンジ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">静止画</th>
+                <td>512〜1024（アダプティブサンプリングON、しきい値0.01あたりから）</td>
+              </tr>
+              <tr>
+                <th scope="row">アニメーション</th>
+                <td>256〜512（デノイズON）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>512</code> はちょうど両方のレンジに入る。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why 3</span>ルックでAgXの眠さを消す</h2>
+        <p>
+          Blender 4.0 以降のデフォルトのビュー変換 <strong>AgX</strong> は、明るくなるほど彩度を落とす設計になっている。これは「ヒュースキッディング（明るい色の色相がズレる／ベタッと潰れる）」を避けるための仕組みで、強い光源や発光マテリアルが自然に見えるという利点がある。その代償として、素の状態は<strong>フラットで低コントラスト＝「洗いざらし」に見える</strong>。
+        </p>
+        <p>
+          ルックは、AgXの上に<strong>S字カーブを掛ける後段処理</strong>。シャドウを締め、中間調の彩度を戻して「パンチ」を復活させる。<strong>AgXのハイライト保護は維持したまま</strong>メリハリだけ足せる。「中から高コントラスト（Medium High Contrast）」は多くの場合の定番の出発点で、もっと強くしたければ「高コントラスト」「非常に高いコントラスト」へ。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Pitfalls</span>つまずきやすい点</h2>
+
+        <h3>アニメーションのチラつき</h3>
+        <p>
+          <strong>人の目は、静止したノイズは「質感」に見え、動くノイズは「チラつき」に見える。</strong>静止画でOKだった設定が、アニメだとフレームごとにノイズパターンが変わってチラついて見えることがある。
+        </p>
+        <ul class="ticks">
+          <li>
+            本番前に <strong>アニメーションシード</strong> をONにして短い区間をテストレンダリングし、チラつきが出ないか確認する
+          </li>
+          <li>
+            レンダリング時のデノイズだけで消えない場合は、<strong>コンポジターのデノイズノード</strong>を連番に対して掛ける。前後フレームを参照できる分、より安定した結果になる
+          </li>
+        </ul>
+
+        <h3>ルックで明るさを直そうとしない</h3>
+        <p>
+          ルックは<strong>表示・出力時の変換</strong>であり、ライティングやマテリアルの値そのものは変わらない。実質的にはレンダリング後のカラーグレーディング。
+        </p>
+        <div class="note">
+          <p>
+            「暗すぎる／明るすぎる」はライティングと露出で直す。「眠い／メリハリがない」をルックで直す。役割を分けて考える。外部ソフトで本格的にカラコレするなら、ルックは「なし」のまま EXR で出す選択もある。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

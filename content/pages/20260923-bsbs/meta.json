@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20260923-bsbs",
+  "title": "Cyclesのレンダリング設定を軽くする（ノイズしきい値・サンプル数・ルック）",
+  "summary": "ノイズしきい値 0.01→0.03、最大サンプル数 4096→512、ルックを「中から高コントラスト」に、の3点で品質を落とさずレンダリング時間を大幅短縮できる（裏取り済み・3つとも妥当）。しきい値が主役で512はキャップ、デノイズON前提。",
+  "mainLabel": "Blender/レンダリング",
+  "subLabels": [
+    "Blender/テクニック"
+  ],
+  "createdAt": "2026-09-23",
+  "updatedAt": "2026-09-23",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_Cyclesのレンダリング設定を軽くする.md",
+    "note": "docs/テクニック/TIPS_Cyclesのレンダリング設定を軽くする.md を夜間取り込みでページ化したもの"
+  }
+}
