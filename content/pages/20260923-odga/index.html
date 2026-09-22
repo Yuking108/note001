@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgXとカラーマネジメント</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・比較表の強調・SVG 図の
+         面塗りだけ色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+        --accent-fill: #eeddd0;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+          --accent-fill: #3a2a1d;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      td .none {
+        color: var(--fg-muted);
+      }
+      tr.pick th,
+      tr.pick td {
+        background: var(--accent-bg);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card ul.ticks {
+        margin: 0.6rem 0 0;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      figure.diagram {
+        max-width: 30rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>AgXとカラーマネジメント</h1>
+        <p class="standfirst">
+          レンダープロパティの「カラーマネジメント」は、Cyclesのリニアな HDR を画面に映せる範囲へ圧縮する工程。AgXが眠く見えるのは不具合ではなく設計どおりで、直す場所は<strong>ビュー変換ではなくルック</strong>。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >ビュー変換は <strong>AgX</strong> のまま。メリハリが足りないならルックを「中から高コントラスト」に。外部ソフトでグレーディングするなら、ルックは「なし」のまま EXR で出す。</span
+        >
+        <p>
+          「暗い／明るい」はライティングと露出で直す。「眠い／メリハリがない」をルックで直す。<strong>ビュー変換を「標準」に戻して直そうとしない</strong>——それはAgXの利点ごと捨てる操作になる。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Context</span>このパネルが何をしているか</h2>
+        <p>
+          Cyclesが計算した結果は、明るさに上限のない<strong>リニアなHDRデータ</strong>。一方でディスプレイが表示できる範囲は限られている。カラーマネジメントは、この <strong>HDR → 表示可能な範囲</strong> の変換を担当する工程で、<strong>シーンのライティングやマテリアルの値そのものは一切変えない</strong>。
+        </p>
+        <p>
+          だから「レンダリングが暗い／眠い／色が飛ぶ」は、ライティングの問題ではなく<strong>この変換の問題</strong>であることが多い。どこを触るかを決めるには、まず変換の順番を把握しておく。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 380 216"
+            role="img"
+            aria-label="変換の流れ。上から、Cyclesの計算結果であるリニアHDR、露出とガンマによる変換前の調整、ビュー変換によるHDRからSDRへの圧縮、ルックによるS字カーブの後段処理、最後に表示デバイス。ビュー変換の段が最も大きく絵を変える"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="9.5" fill="var(--fg)">
+              <!-- 1. 入力 -->
+              <rect
+                x="30"
+                y="10"
+                width="320"
+                height="28"
+                rx="5"
+                fill="none"
+                stroke="var(--border)"
+              />
+              <text x="42" y="28">リニアHDR（Cyclesの計算結果・明るさに上限なし）</text>
+
+              <line x1="190" y1="38" x2="190" y2="50" stroke="var(--fg-muted)" />
+
+              <!-- 2. 露出・ガンマ -->
+              <rect
+                x="30"
+                y="50"
+                width="320"
+                height="28"
+                rx="5"
+                fill="none"
+                stroke="var(--border)"
+              />
+              <text x="42" y="68">露出 / ガンマ ＝ 変換前に明るさを底上げ・減光</text>
+
+              <line x1="190" y1="78" x2="190" y2="90" stroke="var(--fg-muted)" />
+
+              <!-- 3. ビュー変換（主役） -->
+              <rect
+                x="30"
+                y="90"
+                width="320"
+                height="40"
+                rx="5"
+                fill="var(--accent-fill)"
+                stroke="var(--accent-line)"
+              />
+              <text x="42" y="107" font-weight="700">ビュー変換（AgX / Filmic / 標準 …）</text>
+              <text x="42" y="122" fill="var(--accent-ink)">HDR→SDR の方式そのもの。一番大きく絵が変わる</text>
+
+              <line x1="190" y1="130" x2="190" y2="142" stroke="var(--fg-muted)" />
+
+              <!-- 4. ルック -->
+              <rect
+                x="30"
+                y="142"
+                width="320"
+                height="28"
+                rx="5"
+                fill="none"
+                stroke="var(--accent-line)"
+              />
+              <text x="42" y="160">ルック ＝ その上に掛けるS字カーブ（味付け）</text>
+
+              <line x1="190" y1="170" x2="190" y2="182" stroke="var(--fg-muted)" />
+              <polygon points="190,186 186,178 194,178" fill="var(--fg-muted)" />
+
+              <!-- 5. 出力 -->
+              <rect
+                x="30"
+                y="186"
+                width="320"
+                height="24"
+                rx="5"
+                fill="none"
+                stroke="var(--border)"
+              />
+              <text x="42" y="202" fill="var(--fg-muted)">表示（Display Device）＝ 通常は sRGB</text>
+            </g>
+          </svg>
+          <figcaption>
+            上から下へ一方向。<strong>下流（ルック）でいくら味付けしても、上流のライティングは変わらない。</strong>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Panel</span>各項目の役割</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">役割</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">表示（Display Device）</th>
+                <td>出力先のディスプレイの種類。通常は <code>sRGB</code></td>
+              </tr>
+              <tr class="pick">
+                <th scope="row">ビュー（View Transform）</th>
+                <td>HDR→SDRの変換方式そのもの。<strong>ここが一番大きく絵を変える</strong></td>
+              </tr>
+              <tr class="pick">
+                <th scope="row">ルック（Look）</th>
+                <td>ビュー変換の上に掛ける、コントラスト調整のプリセット</td>
+              </tr>
+              <tr>
+                <th scope="row">露出（Exposure）</th>
+                <td>変換前に明るさを底上げ／減光する</td>
+              </tr>
+              <tr>
+                <th scope="row">ガンマ（Gamma）</th>
+                <td>変換前のガンマ補正</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Options</span>ビュー変換の選択肢</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">選択肢</th>
+                <th scope="col">位置づけ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="pick">
+                <th scope="row">AgX</th>
+                <td><strong>Blender 4.0 からのデフォルト。これを使う</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">標準（Standard）</th>
+                <td>変換なしに近い。明るい部分が白にベタ潰れする</td>
+              </tr>
+              <tr>
+                <th scope="row">Filmic</th>
+                <td>3.x 時代のデフォルト</td>
+              </tr>
+              <tr>
+                <th scope="row">False Color</th>
+                <td>明るさを色分けして可視化するデバッグ用</td>
+              </tr>
+              <tr>
+                <th scope="row">Khronos PBR Neutral</th>
+                <td class="none">—</td>
+              </tr>
+              <tr>
+                <th scope="row">Filmic Log</th>
+                <td class="none">—</td>
+              </tr>
+              <tr>
+                <th scope="row">Raw</th>
+                <td class="none">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>—</code> は、選択肢として並んでいることだけ確認していて、中身は調べていないもの。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>なぜAgXは彩度が低く見えるのか</h2>
+        <p>
+          AgXは <strong>明るくなるほど彩度を落とす</strong> 設計になっている。狙いは <strong>ヒュースキッディング（hue skidding）</strong> を避けること。
+        </p>
+        <p>
+          「標準」だと、明るい赤や青が表示範囲を超えた瞬間に色相がズレたり、ベタ塗りに潰れたりする。AgXは白に向かって滑らかに脱色していくので、<strong>強い光源・発光マテリアル・強いハイライトが自然に見える</strong>。
+        </p>
+        <div class="note">
+          <p>
+            つまり「眠く見える」のは不具合ではなく、<strong>フィルムに近い挙動を再現した結果</strong>。その代わり、素の状態はフラットで低コントラストになる。
+          </p>
+        </div>
+
+        <h3>ルックが効く理由</h3>
+        <p>
+          ルックは、ビュー変換の後に <strong>S字カーブを掛ける後段処理</strong>。シャドウを締め、中間調の彩度を戻して「パンチ」を出す。<strong>AgXのハイライト保護を維持したままメリハリだけ足せる</strong>のが利点で、だから「AgXが眠いから標準に戻す」より筋がいい。
+        </p>
+        <ul class="ticks">
+          <li>デフォルトは<strong>「なし（None）」</strong></li>
+          <li>
+            「非常に低いコントラスト」〜「非常に高いコントラスト」の段階が並ぶ（項目名・数はバージョンによって異なる）
+          </li>
+          <li><strong>「中から高コントラスト」が実用上の定番の出発点</strong>とされる</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Rule</span>切り分けの指針</h2>
+        <div class="card">
+          <span class="tag">症状 → 触る場所</span>
+          <ul class="ticks">
+            <li><strong>暗すぎる／明るすぎる</strong> → ライティングと露出</li>
+            <li><strong>眠い／メリハリがない</strong> → ルック</li>
+            <li><strong>明るい色の色相がズレる／ベタ潰れする</strong> → ビュー変換（AgXなら起きにくい）</li>
+          </ul>
+        </div>
+        <p style="margin-top: 1.4rem">
+          根拠は単純で、レンダー結果はリニアHDRであり<strong>そのままでは画面に出せない</strong>。ビュー変換が「どう圧縮するか」を決め、その方針の違いが AgX / Filmic / 標準 の差になる。ルックはその上の味付けにすぎず、シーンの値には触れない。この階層がそのまま切り分けの順番になる。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Deferred</span>保留した選択肢</h2>
+        <h3>ルック「なし」＋ EXR 出力</h3>
+        <p>
+          外部ソフトでカラーグレーディングする前提なら、ルックは<strong>「なし」のまま EXR で出力する</strong>。Blender側で味付けを焼き込まず、後工程に渡す運用。
+        </p>
+        <h3>ビュー変換を「標準」に戻す</h3>
+        <p>
+          眠さは消えるが、ハイライトの色相ズレとベタ潰れが戻ってくる。AgXの利点ごと捨てる操作なので、採らない。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
