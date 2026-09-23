@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20260924-upad",
+  "title": "面ごとに別の画像を貼る（カードの表裏など）",
+  "summary": "レンダリングに効くのはシェーダーエディターの画像テクスチャノードで、UVエディターの画像は位置合わせ用の下敷きにすぎない。貼り分けはマテリアルを2つ作って面に「割り当て」る方法と、1枚の画像に並べてUVで合わせる方法（テクスチャアトラス）の2通り。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/レンダリング"
+  ],
+  "createdAt": "2026-09-24",
+  "updatedAt": "2026-09-24",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_面ごとに別の画像を貼る.md",
+    "note": "docs/テクニック/TIPS_面ごとに別の画像を貼る.md を夜間取り込みでページ化したもの"
+  }
+}

@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>面ごとに別の画像を貼る（カードの表裏など）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・表の強調・SVG 図の面塗りだけ
+         色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+        --accent-fill: #eeddd0;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+          --accent-fill: #3a2a1d;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      tr.pick th,
+      tr.pick td {
+        background: var(--accent-bg);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card ul.ticks,
+      .card ol.steps {
+        margin: 0.6rem 0 0;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      figure.diagram {
+        max-width: 32rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>面ごとに別の画像を貼る（カードの表裏など）</h1>
+        <p class="standfirst">
+          カードの表と裏で違う絵にしたい、のように<strong>1つのオブジェクトの面ごとに画像を変える</strong>ときの手順。やり方は2通りあり、表裏くらいの枚数ならマテリアルを分けるのが素直。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >画像を「貼る」のは<strong>シェーダーエディター</strong>。UVエディターで画像を開いても、それだけではレンダリングに反映されない。</span
+        >
+        <p>
+          ここが一番の勘違いポイント。公式マニュアルにも「UVに画像を当ててレンダリングしても、デフォルトではテクスチャは出てこない」と明記されている。UVエディターの画像は<strong>位置合わせ用の下敷き</strong>、レンダリングで使われる本体は<strong>画像テクスチャノード</strong>。役割が完全に別。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Prerequisite</span>前提：どちらが本体か</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">どこ</th>
+                <th scope="col">役割</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="pick">
+                <th scope="row">シェーダーエディターの<br />「画像テクスチャ」ノード</th>
+                <td>実際にレンダリングで使われる画像。<strong>これが本体</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">UVエディターの画像</th>
+                <td>UVを合わせるための<strong>表示用の下敷き</strong>（ガイド）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>本体側のノード構成</h3>
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 460 132"
+            role="img"
+            aria-label="ノードの接続順。テクスチャ座標ノードのUV出力を、マッピングノードを経て画像テクスチャノードのベクトル入力に繋ぎ、画像テクスチャのカラー出力をプリンシプルBSDFのベースカラーに繋ぐ。マッピングは省略可能"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="9.5" fill="var(--fg)">
+              <!-- テクスチャ座標 -->
+              <rect
+                x="8"
+                y="34"
+                width="96"
+                height="42"
+                rx="5"
+                fill="var(--surface)"
+                stroke="var(--border)"
+              />
+              <text x="18" y="52">テクスチャ座標</text>
+              <text x="18" y="68" fill="var(--accent-ink)" font-weight="700">UV 出力</text>
+
+              <line x1="104" y1="62" x2="126" y2="62" stroke="var(--accent)" />
+              <polygon points="134,62 124,57 124,67" fill="var(--accent)" />
+
+              <!-- マッピング -->
+              <rect
+                x="134"
+                y="34"
+                width="76"
+                height="42"
+                rx="5"
+                fill="var(--accent-bg)"
+                stroke="var(--accent-line)"
+                stroke-dasharray="5 4"
+              />
+              <text x="146" y="52">マッピング</text>
+              <text x="146" y="68" fill="var(--fg-muted)">（省略可）</text>
+
+              <line x1="210" y1="62" x2="232" y2="62" stroke="var(--accent)" />
+              <polygon points="240,62 230,57 230,67" fill="var(--accent)" />
+
+              <!-- 画像テクスチャ -->
+              <rect
+                x="240"
+                y="26"
+                width="100"
+                height="58"
+                rx="5"
+                fill="var(--accent-fill)"
+                stroke="var(--accent-line)"
+              />
+              <text x="250" y="44">画像テクスチャ</text>
+              <text x="250" y="60" fill="var(--accent-ink)" font-weight="700">ベクトル入力</text>
+              <text x="250" y="76" fill="var(--accent-ink)" font-weight="700">カラー出力</text>
+
+              <line x1="340" y1="62" x2="362" y2="62" stroke="var(--accent)" />
+              <polygon points="370,62 360,57 360,67" fill="var(--accent)" />
+
+              <!-- プリンシプルBSDF -->
+              <rect
+                x="370"
+                y="34"
+                width="82"
+                height="42"
+                rx="5"
+                fill="var(--surface)"
+                stroke="var(--border)"
+              />
+              <text x="378" y="52">プリンシプル</text>
+              <text x="378" y="68">ベースカラー</text>
+
+              <text x="8" y="112" fill="var(--fg-muted)">
+                テクスチャ座標の「UV」を通すことで、UV展開の結果が反映される
+              </text>
+            </g>
+          </svg>
+        </figure>
+        <pre><code>テクスチャ座標（UV） → マッピング → 画像テクスチャ → プリンシプルBSDF（ベースカラー）</code></pre>
+        <ul class="ticks">
+          <li>
+            <strong>テクスチャ座標の「UV」出力</strong>を使うことで、<strong>UV展開の結果が反映される</strong>
+          </li>
+          <li>
+            マッピングは位置・回転・スケールの微調整用。無くても動くが、挟んでおくと後で貼り位置を直せる
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Method A</span>A. マテリアルを分けて面に割り当てる</h2>
+        <p>
+          <strong>表裏なら、こっちが素直。</strong>画像を2枚のまま扱えるので管理が楽。
+        </p>
+        <ol class="steps">
+          <li>マテリアルプロパティで<strong>スロットを2つ</strong>作る</li>
+          <li>それぞれに画像テクスチャノードで<strong>別の画像</strong>を設定</li>
+          <li><strong>編集モードに入る</strong></li>
+          <li>面選択モード（<code>3</code>）で<strong>表の面だけを選択</strong></li>
+          <li>マテリアルプロパティで表用スロットを選び、<code>割り当て</code></li>
+          <li>裏の面も同様に</li>
+        </ol>
+        <div class="note">
+          <p>
+            UV展開は、各面のUVが画像の範囲（<code>0〜1</code>）に収まっていればよい。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Method B</span>B. 1枚の画像に並べてUVで貼り分ける</h2>
+        <p>
+          テクスチャアトラス。マテリアル1つ・テクスチャ1枚で済むので軽い。<strong>枚数が増えるときはこちら</strong>。
+        </p>
+        <ol class="steps">
+          <li>表と裏を<strong>1枚の画像に並べて</strong>作っておく</li>
+          <li>
+            編集モードで面を選択 → <code>U</code> → <code>展開</code> /
+            <code>ビューから投影</code>
+          </li>
+          <li>
+            UVエディターで、その面のUVを画像の該当箇所に合わせる（<code>G</code> 移動 /
+            <code>R</code> 回転 / <code>S</code> 拡縮）
+          </li>
+        </ol>
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 420 180"
+            role="img"
+            aria-label="1枚の画像の左半分に表の絵、右半分に裏の絵が並んでいる。表の面のUVを左半分の範囲に重ね、裏の面のUVを右半分の範囲に重ねることで、1枚の画像から面ごとに違う絵を取り出す"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10" fill="var(--fg)">
+              <text x="16" y="18" fill="var(--accent-ink)" font-weight="700">
+                1枚の画像（UVエディターに表示する下敷き）
+              </text>
+
+              <rect
+                x="16"
+                y="28"
+                width="240"
+                height="120"
+                fill="var(--code-bg)"
+                stroke="var(--border)"
+              />
+              <line x1="136" y1="28" x2="136" y2="148" stroke="var(--border)" />
+              <text x="52" y="46" fill="var(--fg-muted)">表の絵</text>
+              <text x="172" y="46" fill="var(--fg-muted)">裏の絵</text>
+
+              <!-- 表の面の UV -->
+              <rect
+                x="32"
+                y="58"
+                width="88"
+                height="72"
+                fill="var(--accent-bg)"
+                stroke="var(--accent)"
+                stroke-dasharray="4 3"
+              />
+              <text x="40" y="98" fill="var(--accent-ink)">表のUV</text>
+
+              <!-- 裏の面の UV -->
+              <rect
+                x="152"
+                y="58"
+                width="88"
+                height="72"
+                fill="var(--accent-fill)"
+                stroke="var(--accent)"
+                stroke-dasharray="4 3"
+              />
+              <text x="160" y="98" fill="var(--accent-ink)">裏のUV</text>
+
+              <text x="278" y="72" fill="var(--fg-muted)">面ごとにUVを</text>
+              <text x="278" y="90" fill="var(--fg-muted)">該当箇所へ</text>
+              <text x="278" y="108" fill="var(--fg-muted)">動かす</text>
+            </g>
+          </svg>
+          <figcaption>
+            このとき<strong>UVエディターに表示する画像が「下敷き」として効いてくる</strong>。位置合わせのために表示する、という位置づけ。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Unwrap</span>UV展開の操作（共通）</h2>
+        <p>編集モードで面を選択 → <code>U</code> でUVメニュー。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">モード</th>
+                <th scope="col">使いどころ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="pick">
+                <th scope="row">ビューから投影<br />（Project from View）</th>
+                <td>
+                  <strong>平らなカードならこれが素直。</strong>正面から見た状態がそのまま投影される
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">展開<br />（Unwrap）</th>
+                <td>シームに沿って開く。基本</td>
+              </tr>
+              <tr>
+                <th scope="row">スマートUV投影</th>
+                <td>自動でバラす。形が複雑なとき</td>
+              </tr>
+              <tr>
+                <th scope="row">キューブ／円筒／球状投影</th>
+                <td>形が単純な立体のとき</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <span class="tag">守ること</span>
+          <ul class="ticks">
+            <li>
+              <strong>必ず編集モードで、対象の面だけを選択してから</strong>行う。オブジェクトモードのままでは面単位の操作にならない
+            </li>
+            <li>
+              ワークスペースを <code>UV Editing</code> や <code>Shading</code>
+              に切り替えると、UVエディターとシェーダーエディターが同時に見えて作業が速い
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Gotchas</span>つまずきやすいところ</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">症状</th>
+                <th scope="col">原因</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">UVエディターで画像を開いたのにレンダリングに出ない</th>
+                <td>
+                  シェーダーエディターで<strong>画像テクスチャノードを繋いでいない</strong>（前提のとおり）
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">UV展開しても貼り位置が変わらない</th>
+                <td>
+                  画像テクスチャの<strong>ベクトル入力にUVが繋がっていない</strong>。テクスチャ座標の「UV」から繋ぐ
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">裏面の画像が鏡像になる</th>
+                <td>
+                  UVが反転している。UVエディターで <code>S</code> → <code>X</code> →
+                  <code>-1</code>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">面を選んで割り当てたのに変わらない</th>
+                <td>
+                  編集モードではなく<strong>オブジェクトモードで操作していた</strong>／<code>割り当て</code>を押していない
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
