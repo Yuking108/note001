@@ -145,6 +145,8 @@ function htmlTemplate(title: string): string {
         background: var(--code-bg);
         padding: 0.15em 0.4em;
         border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
       }
       /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
       pre,
@@ -165,6 +167,9 @@ function htmlTemplate(title: string): string {
       table {
         border-collapse: collapse;
         width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
         font-size: 0.95rem;
       }
       th,

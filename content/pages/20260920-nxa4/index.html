@@ -324,10 +324,8 @@
       }
       ol.steps > li {
         counter-increment: step;
-        display: grid;
-        grid-template-columns: 1.7rem 1fr;
-        gap: 0.9rem;
-        align-items: baseline;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
       }
       ol.steps > li::before {
         content: counter(step);
@@ -337,6 +335,9 @@
         border-bottom: 1px solid var(--accent-line);
         padding-bottom: 0.1rem;
         text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.7rem;
       }
       ol.steps .note {
         display: block;
@@ -499,11 +500,10 @@
       }
       ol.workflow > li {
         counter-increment: wf;
-        display: grid;
-        grid-template-columns: 3.25rem 1fr;
-        gap: 1.25rem;
         padding: 1.05rem 0;
         border-top: 1px solid var(--line-soft);
+        position: relative;
+        padding-left: calc(3.25rem + 1.25rem);
       }
       ol.workflow > li:last-child {
         border-bottom: 1px solid var(--line-soft);
@@ -515,6 +515,9 @@
         letter-spacing: 0.08em;
         color: var(--ink-3);
         padding-top: 0.18em;
+        position: absolute;
+        left: 0;
+        width: 3.25rem;
       }
 
       /* ---------------- まとめ ---------------- */

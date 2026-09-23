@@ -315,10 +315,8 @@
       }
       ol.steps > li {
         counter-increment: step;
-        display: grid;
-        grid-template-columns: 1.7rem 1fr;
-        gap: 0.9rem;
-        align-items: baseline;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
       }
       ol.steps > li::before {
         content: counter(step);
@@ -328,6 +326,9 @@
         border-bottom: 1px solid var(--accent-line);
         padding-bottom: 0.1rem;
         text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.7rem;
       }
 
       ul.ticks {

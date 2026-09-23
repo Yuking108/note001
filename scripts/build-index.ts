@@ -159,6 +159,57 @@ function findExternalReferences(html: string): string[] {
 }
 
 /**
+ * 「マーカー用の狭い列を持つグリッド」を `li` に使っている箇所を探す。
+ *
+ * `li { display: grid; grid-template-columns: 1.7rem 1fr }` のような書き方は、
+ * li の中身が**テキストだけ**なら意図通りに出る。しかし `<strong>` や `<code>` を
+ * 1つ挟んだ瞬間、それぞれが独立したグリッド項目になり、3つ目以降が
+ * マーカー用の 1.7rem の列に落ちて**1文字ずつ縦に並ぶ**。
+ *
+ * 見た目だけの問題なので索引は通ってしまい、公開されて初めて気づくことになる。
+ * マーカーは `position: absolute` で置き、本文は通常のインライン整形に任せること。
+ */
+function findFragileListGrids(html: string): string[] {
+  const style = html.match(/<style\b[^>]*>([\s\S]*?)<\/style>/gi);
+  if (style === null) return [];
+
+  const found: string[] = [];
+  const rule = /([^{}]*\bli\b[^{}]*)\{([^{}]*)\}/g;
+
+  for (const block of style) {
+    for (const match of block.matchAll(rule)) {
+      const selector = match[1]?.trim().split('\n').pop()?.trim() ?? '';
+      const body = match[2] ?? '';
+      if (!/display\s*:\s*(grid|flex)/.test(body)) continue;
+
+      // 1つ目のトラックが 5rem 未満の固定幅＝マーカー用の列とみなす
+      const columns = body.match(/grid-template-columns:\s*([\d.]+)(rem|em|px|ch)\b/);
+      if (columns === null) continue;
+      const size = Number(columns[1]);
+      const unit = columns[2];
+      const remish = unit === 'px' ? size / 16 : size;
+      if (remish >= 5) continue;
+
+      found.push(selector);
+    }
+  }
+  return found;
+}
+
+/**
+ * 横スクロールの枠に入っていない表を数える（設計書 §7.1 の5）。
+ *
+ * 表は `min-width` を持つので、枠の外に置くと狭い画面で文書ごと横に伸びる。
+ * 枠に入れておけば、はみ出す分だけがその内側でスクロールする。
+ */
+function countUnwrappedTables(html: string): number {
+  const total = html.match(/<table\b/gi)?.length ?? 0;
+  const wrapped =
+    html.match(/<(?:div|figure)\b[^>]*class="[^"]*\bscroll[^"]*"[^>]*>\s*<table\b/gi)?.length ?? 0;
+  return total - wrapped;
+}
+
+/**
  * 完結した文書であることを要求する（設計書 §7.1）。
  * 注入の足場が無い HTML は索引を書く前に弾く。
  */
@@ -180,6 +231,23 @@ function validateHtmlStructure(html: string, slug: string): boolean {
 
   for (const reference of findExternalReferences(html)) {
     warn(`${where}: 外部参照 "${reference}" は CSP で遮断されます`);
+  }
+
+  const unwrapped = countUnwrappedTables(html);
+  if (unwrapped > 0) {
+    warn(
+      `${where}: 表 ${unwrapped} 個が横スクロールの枠（class="scroll-x" など）の外にあります。` +
+        '狭い画面で文書ごと横に伸びます',
+    );
+  }
+
+  for (const selector of findFragileListGrids(html)) {
+    fail(
+      `${where}: "${selector}" が li をグリッドにしています。` +
+        '中に <strong> や <code> を混ぜると、それらが狭いマーカー列に落ちて1文字ずつ縦に並びます。' +
+        'マーカーは position: absolute で置き、li は通常の整形に戻してください',
+    );
+    ok = false;
   }
 
   return ok;

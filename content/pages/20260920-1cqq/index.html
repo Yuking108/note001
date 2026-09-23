@@ -214,12 +214,11 @@
       }
       ol.causes > li {
         counter-increment: cause;
-        display: grid;
-        grid-template-columns: 2rem 1fr;
-        gap: 1rem;
         padding: 1rem 1.15rem;
         background: var(--surface);
         border: 1px solid var(--line);
+        position: relative;
+        padding-left: calc(2rem + 1rem);
       }
       ol.causes > li::before {
         content: counter(cause);
@@ -228,6 +227,9 @@
         color: var(--ink-3);
         text-align: center;
         padding-top: 0.15em;
+        position: absolute;
+        left: 0;
+        width: 2rem;
       }
       ol.causes > li.top {
         background: var(--accent-bg);

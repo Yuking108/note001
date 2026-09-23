@@ -162,6 +162,8 @@
         background: var(--code-bg);
         padding: 0.15em 0.4em;
         border-radius: 4px;
+        /* 長いパスや URL でも折り返す（狭い幅で文書自体が横に伸びるのを防ぐ） */
+        overflow-wrap: anywhere;
       }
       /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
       pre,
@@ -187,8 +189,14 @@
       table {
         border-collapse: collapse;
         width: 100%;
-        min-width: 26rem;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる */
+        min-width: 36rem;
         font-size: 0.93rem;
+      }
+      /* 5列の比較表。狭い幅で1列あたり数文字まで潰れると縦書きのように読めなくなるので、
+         詰め込まずに .scroll-x の内側で横スクロールさせる */
+      table.wide {
+        min-width: 46rem;
       }
       th,
       td {
@@ -309,10 +317,8 @@
       }
       ol.steps > li {
         counter-increment: step;
-        display: grid;
-        grid-template-columns: 1.7rem 1fr;
-        gap: 0.9rem;
-        align-items: baseline;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
       }
       ol.steps > li::before {
         content: counter(step);
@@ -322,6 +328,9 @@
         border-bottom: 1px solid var(--accent-line);
         padding-bottom: 0.1rem;
         text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.7rem;
       }
 
       ul.ticks {
@@ -690,7 +699,7 @@ done</code></pre>
         </p>
 
         <div class="scroll-x">
-          <table>
+          <table class="wide">
             <thead>
               <tr>
                 <th scope="col">アドオン</th>

@@ -267,14 +267,12 @@
       ol.stack > li {
         counter-increment: mod;
         position: relative;
-        display: grid;
-        grid-template-columns: 1.6rem 1fr;
-        gap: 0.9rem;
-        align-items: baseline;
         padding: 0.8rem 1rem;
         background: var(--surface);
         border: 1px solid var(--line);
         border-bottom: none;
+        position: relative;
+        padding-left: calc(1.6rem + 0.9rem);
       }
       ol.stack > li:last-child {
         border-bottom: 1px solid var(--line);
@@ -285,6 +283,9 @@
         font-size: 0.72rem;
         color: var(--ink-3);
         text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.6rem;
       }
       ol.stack .name {
         font-weight: 700;
@@ -331,10 +332,8 @@
       }
       ol.steps > li {
         counter-increment: step;
-        display: grid;
-        grid-template-columns: 1.7rem 1fr;
-        gap: 0.9rem;
-        align-items: baseline;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
       }
       ol.steps > li::before {
         content: counter(step);
@@ -344,6 +343,9 @@
         border-bottom: 1px solid var(--accent-line);
         padding-bottom: 0.1rem;
         text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.7rem;
       }
 
       ul.ticks {

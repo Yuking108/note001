@@ -33,6 +33,27 @@
 - `reference` … 引く対象を前に出す（表・定義リスト中心）→ 補足は後ろ。読み物にしない
 - `other` … 原文の構造を尊重しつつ、結論にあたる部分を先頭に出す
 
+## やってはいけないレイアウト（実際に壊れた例）
+
+- **`li` や段落を `display: grid` / `flex` にして、番号や記号の列を作らないこと。**
+  `li { display: grid; grid-template-columns: 1.7rem 1fr }` は、li の中身がテキストだけなら
+  意図通りに出ます。しかし `<strong>` や `<code>` を1つ挟んだ瞬間、**それぞれが独立したグリッド項目**になり、
+  3つ目以降が 1.7rem の狭い列に落ちて**1文字ずつ縦に並びます**。
+  番号や記号は `position: absolute` で置き、li 本体は `position: relative` + `padding-left` にしてください。
+  （この形はビルド時に機械的に弾かれます）
+
+```css
+/* 正しい形 */
+ol.steps > li { counter-increment: step; position: relative; padding-left: calc(1.7rem + 0.9rem); }
+ol.steps > li::before { content: counter(step); position: absolute; left: 0; width: 1.7rem; text-align: center; }
+```
+
+- **日本語の本文が入る表を狭く潰さないこと。** `.scroll-x` の内側に入れたうえで、
+  `table { min-width: 36rem }` 程度（列が4つ以上なら 46rem 程度）を指定します。
+  指定しないと、狭い画面で1列が2〜3文字まで潰れて縦書きのように読めなくなります。
+- **長いパスや URL を含むインラインの `code` には `overflow-wrap: anywhere;` を付けること。**
+  折り返せないと、その1語のために文書全体が横スクロールします。
+
 ## 守ること（保存前に自分で確認）
 
 - 外部ホストへの参照がゼロ（CDN・Web フォント・外部画像・fetch/XHR。CSP で機械的に遮断されるので、書いても表示されません）
