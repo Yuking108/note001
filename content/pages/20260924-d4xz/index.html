@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ボトルの曲面づくりと角の調整</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・表の強調・SVG 図の面塗りだけ
+         色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+        --accent-fill: #eeddd0;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+          --accent-fill: #3a2a1d;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      tr.pick th,
+      tr.pick td {
+        background: var(--accent-bg);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card ul.ticks,
+      .card ol.steps {
+        margin: 0.6rem 0 0;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      figure.diagram {
+        max-width: 32rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>ボトルの曲面づくりと角の調整</h1>
+        <p class="standfirst">
+          ボトルのような回転体で、<strong>くびれ・ふくらみ</strong>を作り、<strong>全体の角</strong>を整えるまでの流れ。曲面はループカット＋スケール、角はベベル→サブサーフの順で決まる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >曲面は<strong>辺ループを <code>S</code> → <code>Shift + Z</code></strong
+          >で太さだけ変える。角は<strong>ベベルを上、サブサーフを下</strong>に積み、<strong>ベベルの幅で鋭さを決める</strong>。</span
+        >
+        <p>
+          ベベルとサブサーフは別々の処理ではなく、ベベルが作る細い帯がサブサーフに「ここは角」と教えている関係。だから順番が逆だと成立しない。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Prereq</span>前提：トポロジーを先に疑う</h2>
+        <p>
+          <strong>ループカットは極（三角形やNゴン）で止まる。</strong>
+          円柱の天面・底面がNゴンのままだと、そこでループが途切れる。思ったように形が取れないときは、操作を疑う前に<strong>まずトポロジー</strong>を見る。
+        </p>
+        <div class="card">
+          <span class="tag">そもそも円柱から作るべきか</span>
+          <p>
+            ボトルを一から作るなら、円柱をいじるより<strong>「断面のプロファイル＋スクリューモディファイア」</strong>のほうが圧倒的に編集しやすい（輪郭の頂点を動かすだけでシルエットが変わる）。ループカット＋スケールは、<strong>すでにある円柱形を手早く整える</strong>ときの手段、という位置づけ。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 1</span>曲面を作る — ループカット + スケール</h2>
+        <ol class="steps">
+          <li>
+            <code>Ctrl + R</code> → 辺にカーソルを乗せると<strong>マゼンタの線</strong>でカット位置がプレビューされる
+          </li>
+          <li>
+            クリックで確定 → そのままスライドできるので、位置を決めて再クリック（右クリック /
+            <code>Esc</code> でスライドせず中央に固定）
+          </li>
+          <li>辺ループを <code>Alt + クリック</code> で選択</li>
+          <li><code>S</code> でスケール → くびれ・ふくらみができる</li>
+        </ol>
+
+        <h3>効くキー</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">効果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="pick">
+                <th scope="row"><code>S</code> → <code>Shift + Z</code></th>
+                <td>
+                  Z以外（XY）だけスケール。<strong>円形断面を保ったまま太さだけ変える</strong>。回転体ではこれが基本
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">プロポーショナル編集（<code>O</code>）</th>
+                <td>
+                  隣のループも滑らかに追従する。<strong>境目がカクッと折れるのを防ぐ</strong>。ホイールで影響範囲を調整
+                </td>
+              </tr>
+              <tr>
+                <th scope="row"><code>G</code> → <code>G</code>（辺スライド）</th>
+                <td>ループの位置だけを面に沿って動かす</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>G</code> → <code>Z</code></th>
+                <td>高さ方向の位置調整</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>Ctrl + R</code> 中にホイール／数字入力</th>
+                <td>カットの本数を増やす（均等に配置される）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <p>
+            ループを増やしすぎると後の調整が大変になる。<strong>少ない本数で形を決めてから足す</strong>。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 2</span>全体の角を整える — ベベル → サブサーフ</h2>
+        <p>
+          <strong>順番がすべて。</strong>ベベルは必ずサブディビジョンサーフェスより上に置く。「サブサーフはほぼ常にスタックの最後」が原則で、オートスムーズはさらにその後ろ。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 460 200"
+            role="img"
+            aria-label="モディファイアスタックの順番。上からベベル、サブディビジョンサーフェス、最後にスムーズ by アングル（オートスムーズ）。上にあるものほど先に処理される"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10" fill="var(--fg)">
+              <text x="8" y="26" fill="var(--fg-muted)">上＝先</text>
+              <line x1="30" y1="38" x2="30" y2="166" stroke="var(--border)" />
+              <text x="8" y="186" fill="var(--fg-muted)">下＝後</text>
+
+              <rect
+                x="60"
+                y="14"
+                width="300"
+                height="42"
+                rx="6"
+                fill="var(--accent-fill)"
+                stroke="var(--accent-line)"
+              />
+              <text x="76" y="40" fill="var(--accent-ink)" font-weight="700">ベベル</text>
+              <text x="200" y="40" fill="var(--fg-muted)">角に細い帯を作る</text>
+
+              <line x1="210" y1="56" x2="210" y2="72" stroke="var(--accent)" />
+              <polygon points="210,80 205,70 215,70" fill="var(--accent)" />
+
+              <rect
+                x="60"
+                y="80"
+                width="300"
+                height="42"
+                rx="6"
+                fill="var(--surface)"
+                stroke="var(--border)"
+              />
+              <text x="76" y="106">サブディビジョンサーフェス</text>
+
+              <line x1="210" y1="122" x2="210" y2="138" stroke="var(--accent)" />
+              <polygon points="210,146 205,136 215,136" fill="var(--accent)" />
+
+              <rect
+                x="60"
+                y="146"
+                width="300"
+                height="42"
+                rx="6"
+                fill="var(--surface)"
+                stroke="var(--border)"
+              />
+              <text x="76" y="166">スムーズ by アングル</text>
+              <text x="76" y="182" fill="var(--fg-muted)">（オートスムーズ）＝一番最後</text>
+            </g>
+          </svg>
+        </figure>
+
+        <div class="note">
+          <p>
+            ⚠️ ここでの「適用」は、モディファイアを<strong>追加する</strong>という意味。<code>Ctrl + A</code>
+            の<strong>適用（確定）は最後まで我慢する</strong>。形を触っている間は非破壊で持つのが鉄則。
+          </p>
+        </div>
+
+        <h3>なぜベベルが先なのか</h3>
+        <p>
+          サブディビジョンサーフェスは、<strong>辺の近くに別の辺があるほど、その角を鋭く保つ</strong>という性質がある。ベベルが作る細い帯が、そのまま<strong>サポートエッジ（角を支える辺）</strong>として働く。つまり<strong>ベベルの幅が、角の丸みそのものを決める。</strong>
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 460 210"
+            role="img"
+            aria-label="断面の比較。ベベル幅が狭いと支える辺が角の近くに来るため角が鋭く残り、幅が広いと支える辺が遠ざかるため角が大きく丸くなる"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10" fill="var(--fg)">
+              <line x1="230" y1="14" x2="230" y2="196" stroke="var(--border)" />
+
+              <!-- 左：幅が狭い -->
+              <text x="30" y="34" fill="var(--accent-ink)" font-weight="700">幅が狭い</text>
+              <path
+                d="M 40 60 L 160 60 L 160 170"
+                fill="none"
+                stroke="var(--fg-muted)"
+                stroke-dasharray="3 3"
+              />
+              <path
+                d="M 40 60 L 144 60 Q 160 60 160 76 L 160 170"
+                fill="none"
+                stroke="var(--accent)"
+                stroke-width="2"
+              />
+              <g fill="var(--accent)">
+                <circle cx="144" cy="60" r="3" />
+                <circle cx="160" cy="76" r="3" />
+              </g>
+              <text x="40" y="192" fill="var(--fg-muted)">サポートが近い＝鋭く残る</text>
+
+              <!-- 右：幅が広い -->
+              <text x="260" y="34" fill="var(--accent-ink)" font-weight="700">幅が広い</text>
+              <path
+                d="M 260 60 L 380 60 L 380 170"
+                fill="none"
+                stroke="var(--fg-muted)"
+                stroke-dasharray="3 3"
+              />
+              <path
+                d="M 260 60 L 316 60 Q 380 60 380 124 L 380 170"
+                fill="none"
+                stroke="var(--accent)"
+                stroke-width="2"
+              />
+              <g fill="var(--accent)">
+                <circle cx="316" cy="60" r="3" />
+                <circle cx="380" cy="124" r="3" />
+              </g>
+              <text x="260" y="192" fill="var(--fg-muted)">サポートが遠い＝丸くなる</text>
+            </g>
+          </svg>
+          <figcaption>
+            点線が元の角、実線がサブサーフ後の形。丸い点がベベルの作った辺。角の鋭さはベベル幅で調整する、というのはこの図の関係のこと。
+          </figcaption>
+        </figure>
+
+        <h3>サブサーフと併用するときのベベル設定</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">設定</th>
+                <th scope="col">推奨</th>
+                <th scope="col">理由</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">セグメント数</th>
+                <td><strong>偶数</strong></td>
+                <td>サブサーフとの相性が良い</td>
+              </tr>
+              <tr>
+                <th scope="row">プロファイル</th>
+                <td><strong>1.0</strong></td>
+                <td>同上</td>
+              </tr>
+              <tr>
+                <th scope="row">制限方法</th>
+                <td><strong>ウェイト</strong></td>
+                <td>狙った辺だけに効かせられる</td>
+              </tr>
+              <tr>
+                <th scope="row">ノーマルを固める<br />（Harden Normals）</th>
+                <td><strong>使わない</strong></td>
+                <td>サブサーフ併用時は不要。相性が悪い</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <span class="tag">そもそもサブサーフは必要か</span>
+          <p>
+            <strong
+              >単純な形なら、ベベルのセグメント数を増やすだけでサブサーフなしでも十分滑らかになる。</strong
+            >
+            極の変形問題もUVの歪みも起きないので、結果がきれいなことも多い。ボトルのような回転体は面が素直なので相性は悪くないが、まずは<strong>ベベルだけで足りないか確かめる</strong>。サブサーフは「必要なら使う」くらいの距離感でよい。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 3</span>一部の角だけ調整する</h2>
+        <p>
+          ベベルモディファイアの<strong>制限方法を「ウェイト」</strong>にして、辺ごとにベベルウェイトを付ける。
+        </p>
+        <ol class="steps">
+          <li>編集モードで辺を選択</li>
+          <li><code>Ctrl + E</code> → <strong>ベベルウェイト</strong> でドラッグして 1 に</li>
+          <li>モディファイアの制限方法を「ウェイト」に</li>
+        </ol>
+        <p>
+          <strong>ウェイト値は幅の倍率にもなる</strong>ので、1つのモディファイアで「太い面取り」と「細い面取り」を作り分けられる。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Pitfalls</span>うまくいかないときのチェック</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">症状</th>
+                <th scope="col">対処</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">角が歪む</th>
+                <td><strong>ベベル幅を小さくする</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">極（5本以上の辺が集まる頂点）の周りが崩れる</th>
+                <td>その付近に<strong>サポートループを足す</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">UVが伸びる／テクスチャが歪む</th>
+                <td>
+                  ベベル＋サブサーフの<strong>既知の弱点</strong>。面の大きさを揃える（正方形に近づける）ほどマシになる
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">角が立ちすぎ／丸すぎ</th>
+                <td>ベベル幅で調整。オートスムーズの角度しきい値も見る</td>
+              </tr>
+              <tr>
+                <th scope="row">ループカットが途中で止まる</th>
+                <td>極（三角形・Nゴン）で止まっている。<strong>トポロジーを直す</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Recap</span>まとめ</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">方法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">くびれ・ふくらみ</th>
+                <td>
+                  ループカット → 辺ループを <code>S</code> → <code>Shift + Z</code>。プロポーショナル編集で馴染ませる
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">ボトルを一から</th>
+                <td>プロファイル + スクリューモディファイア</td>
+              </tr>
+              <tr>
+                <th scope="row">全体の角</th>
+                <td>ベベル（上）→ サブサーフ（下）→ オートスムーズ（最後）</td>
+              </tr>
+              <tr class="pick">
+                <th scope="row">角の鋭さ</th>
+                <td><strong>ベベルの幅</strong>で決まる。狭い＝鋭い、広い＝丸い</td>
+              </tr>
+              <tr>
+                <th scope="row">一部の角だけ</th>
+                <td>ベベルウェイト + 制限方法「ウェイト」</td>
+              </tr>
+              <tr>
+                <th scope="row">確定（適用）</th>
+                <td>書き出し直前まで我慢。複製をバックアップに残す</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
