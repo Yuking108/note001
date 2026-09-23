@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>バンプノードの効果</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・表の強調・SVG 図の面塗りだけ
+         色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+        --accent-fill: #eeddd0;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+          --accent-fill: #3a2a1d;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 26rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      tr.pick th,
+      tr.pick td {
+        background: var(--accent-bg);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card ul.ticks,
+      .card ol.steps {
+        margin: 0.6rem 0 0;
+      }
+
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 1.7rem 1fr;
+        gap: 0.9rem;
+        align-items: baseline;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      figure.diagram {
+        max-width: 32rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>バンプノードの効果</h1>
+        <p class="standfirst">
+          高さのグレースケール画像から、ライティング用の法線を偽造するノード。<strong>実際の凹凸は作らない</strong>ので、何に使えて何に使えないかがはっきり分かれる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >浅い凹凸ならバンプ。<strong>シルエット（輪郭）に出したいならバンプでは無理</strong>で、ディスプレイスメントを使う。</span
+        >
+        <p>
+          バンプが変えるのは<strong>光の当たり方だけ</strong>。面は平らなままなので、真横から見ると平らなのがバレる。紙の繊維、皮のシボ、金属のヘアライン、印刷インクの微かな盛り——この程度の浅さが守備範囲。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Compare</span>バンプとノーマルマップの違い</h2>
+        <p>
+          どちらも「ジオメトリは変わらない」点は同じ。違うのは<strong>何を入力に取るか</strong>で、手持ちの画像を流用したいならバンプ。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"></th>
+                <th scope="col">バンプ</th>
+                <th scope="col">ノーマルマップ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">入力</th>
+                <td><strong>高さ</strong>（グレースケール1枚）</td>
+                <td><strong>法線そのもの</strong>（RGBの青紫の画像）</td>
+              </tr>
+              <tr>
+                <th scope="row">計算</th>
+                <td>高さから法線を<strong>計算する</strong></td>
+                <td>記録された法線を<strong>そのまま使う</strong></td>
+              </tr>
+              <tr class="pick">
+                <th scope="row">作りやすさ</th>
+                <td>手持ちの画像を<strong>流用しやすい</strong></td>
+                <td>専用に焼く必要がある</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>判断の根拠：何をしているか</h2>
+        <p>
+          バンプは高さテクスチャを読み、シェーディング点とその近傍の高さを見て、<strong>摂動を加えた法線</strong>を生成する。その法線をプリンシプルBSDFの「ノーマル」入力に渡すと、陰影が変わって凹凸に見える。
+        </p>
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 460 120"
+            role="img"
+            aria-label="接続の流れ。高さのグレースケール画像をバンプノードの高さ入力に繋ぎ、バンプノードの法線出力をプリンシプルBSDFのノーマル入力に繋ぐ。面は平らなまま陰影だけが変わる"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="9.5" fill="var(--fg)">
+              <rect
+                x="8"
+                y="26"
+                width="118"
+                height="44"
+                rx="5"
+                fill="var(--surface)"
+                stroke="var(--border)"
+              />
+              <text x="18" y="44">高さ</text>
+              <text x="18" y="60" fill="var(--fg-muted)">（グレースケール）</text>
+
+              <line x1="126" y1="48" x2="148" y2="48" stroke="var(--accent)" />
+              <polygon points="156,48 146,43 146,53" fill="var(--accent)" />
+
+              <rect
+                x="156"
+                y="18"
+                width="108"
+                height="60"
+                rx="5"
+                fill="var(--accent-fill)"
+                stroke="var(--accent-line)"
+              />
+              <text x="166" y="36">バンプ</text>
+              <text x="166" y="52" fill="var(--accent-ink)" font-weight="700">高さ 入力</text>
+              <text x="166" y="68" fill="var(--accent-ink)" font-weight="700">法線 出力</text>
+
+              <line x1="264" y1="48" x2="286" y2="48" stroke="var(--accent)" />
+              <polygon points="294,48 284,43 284,53" fill="var(--accent)" />
+
+              <rect
+                x="294"
+                y="18"
+                width="158"
+                height="60"
+                rx="5"
+                fill="var(--surface)"
+                stroke="var(--border)"
+              />
+              <text x="304" y="36">プリンシプルBSDF</text>
+              <text x="304" y="52" fill="var(--accent-ink)" font-weight="700">ノーマル 入力</text>
+              <text x="304" y="68" fill="var(--fg-muted)">面は平らなまま</text>
+
+              <text x="8" y="102" fill="var(--fg-muted)">
+                実際のジオメトリは一切変わらない。変わるのはライティングの計算だけ
+              </text>
+            </g>
+          </svg>
+        </figure>
+        <pre><code>高さ（グレースケール） → バンプ → 法線 → プリンシプルBSDFのノーマル入力
+                                    ↑ 面は平らなまま、陰影だけ変わる</code></pre>
+
+        <h3>だから、こうなる</h3>
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 460 190"
+            role="img"
+            aria-label="断面の比較。バンプでは表面の線は平らなまま、法線だけが場所ごとに傾いている。ディスプレイスメントでは表面の線そのものが波打ち、法線も面に従って向きを変える"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10" fill="var(--fg)">
+              <line x1="230" y1="14" x2="230" y2="176" stroke="var(--border)" />
+
+              <!-- 左：バンプ -->
+              <text x="20" y="34" fill="var(--accent-ink)" font-weight="700">バンプ</text>
+              <line x1="24" y1="130" x2="214" y2="130" stroke="var(--accent)" stroke-width="2" />
+              <g stroke="var(--fg-muted)">
+                <line x1="44" y1="130" x2="34" y2="102" />
+                <line x1="78" y1="130" x2="73" y2="100" />
+                <line x1="112" y1="130" x2="112" y2="98" />
+                <line x1="146" y1="130" x2="151" y2="100" />
+                <line x1="180" y1="130" x2="190" y2="102" />
+              </g>
+              <g fill="var(--accent)">
+                <circle cx="34" cy="102" r="2.5" />
+                <circle cx="73" cy="100" r="2.5" />
+                <circle cx="112" cy="98" r="2.5" />
+                <circle cx="151" cy="100" r="2.5" />
+                <circle cx="190" cy="102" r="2.5" />
+              </g>
+              <text x="24" y="86" fill="var(--fg-muted)">法線だけ傾く</text>
+              <text x="24" y="154" fill="var(--fg-muted)">面は平ら＝</text>
+              <text x="24" y="170" fill="var(--fg-muted)">輪郭に出ない</text>
+
+              <!-- 右：ディスプレイスメント -->
+              <text x="248" y="34" fill="var(--accent-ink)" font-weight="700">
+                ディスプレイスメント
+              </text>
+              <path
+                d="M 248 132 Q 272 108 296 132 T 344 132 T 392 132 T 440 132"
+                fill="none"
+                stroke="var(--accent)"
+                stroke-width="2"
+              />
+              <g stroke="var(--fg-muted)">
+                <line x1="272" y1="120" x2="272" y2="96" />
+                <line x1="320" y1="144" x2="320" y2="120" />
+                <line x1="368" y1="120" x2="368" y2="96" />
+              </g>
+              <g fill="var(--accent)">
+                <circle cx="272" cy="96" r="2.5" />
+                <circle cx="320" cy="120" r="2.5" />
+                <circle cx="368" cy="96" r="2.5" />
+              </g>
+              <text x="248" y="160" fill="var(--fg-muted)">メッシュが実際に</text>
+              <text x="248" y="176" fill="var(--fg-muted)">変形する</text>
+            </g>
+          </svg>
+          <figcaption>
+            ジオメトリが変わらないことが、そのまま限界になる。深い凹凸や、影の落ち方まで変えたい場合には向かない。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Inputs</span>入力の意味</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">入力</th>
+                <th scope="col">役割</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">高さ<br />（Height）</th>
+                <td>グレースケール値。<strong>明るい＝高い、暗い＝低い</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">強さ<br />（Strength）</th>
+                <td>効果の強度。<code>0</code> で無効、<code>1</code> でフル適用</td>
+              </tr>
+              <tr>
+                <th scope="row">距離<br />（Distance）</th>
+                <td>高さ値の<strong>倍率</strong>。凹凸の深さ全体をスケールする</td>
+              </tr>
+              <tr>
+                <th scope="row">法線<br />（Normal）</th>
+                <td>計算の元になる法線。他のバンプやノーマルマップと重ねるときに使う</td>
+              </tr>
+              <tr>
+                <th scope="row">反転<br />（Invert）</th>
+                <td>凹凸を逆にする。出っぱりが凹む</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <span class="tag">強さと距離の使い分け</span>
+          <p>
+            どちらも「強く見せる」効果だが、<strong>距離が高さの実寸スケール、強さが最終的な混ぜ具合</strong>。まず距離で凹凸の深さを決め、強さで馴染ませる、という順が分かりやすい。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Example</span>実例：カードのマテリアル</h2>
+        <p>
+          カードのカラー画像を<strong>そのまま「高さ」に入れて、距離 <code>0.001</code> / 強さ
+            <code>1.0</code></strong
+          >。印刷のインクの微かな盛りを表現する使い方で、<strong>絵柄の明暗がそのまま微細な凹凸になる</strong>。距離が小さいのは、紙の印刷程度の浅さを狙っているため。
+        </p>
+        <div class="note">
+          <p>
+            ⚠️ 厳密には、高さに使う画像の色空間は
+            <strong>非カラー（Non-Color）</strong>が正しい。カラー用のsRGB画像を流用するのは手軽さ優先のショートカットで、意図した明暗と実際の高さがずれる。見た目が合っていれば実用上は問題ないが、<strong>狙いどおりにならないときはここを疑う</strong>。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Deferred</span>保留：ディスプレイスメント</h2>
+        <p>
+          本当に形を変えたいなら<strong>ディスプレイスメント</strong>（実際にメッシュを変形させる）を使う。バンプで足りるうちはバンプのほうが軽いので、<strong>シルエットに出したくなった時点で切り替える</strong>、という線引きでよい。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

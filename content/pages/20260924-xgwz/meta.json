@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20260924-xgwz",
+  "title": "バンプノードの効果",
+  "summary": "バンプは高さ（グレースケール）から法線を偽造するノードで、ジオメトリは一切変わらずライティングの計算だけが変わる。そのためシルエットには出ず浅い凹凸専用で、深い凹凸はディスプレイスメント、記録済みの法線を使うならノーマルマップという住み分けになる。",
+  "mainLabel": "Blender/レンダリング",
+  "subLabels": [
+    "Blender/知識"
+  ],
+  "createdAt": "2026-09-24",
+  "updatedAt": "2026-09-24",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "知識/KNOW_バンプノード.md",
+    "note": "docs/知識/KNOW_バンプノード.md を夜間取り込みでページ化したもの"
+  }
+}
