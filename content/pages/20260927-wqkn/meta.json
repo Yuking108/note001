@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20260927-wqkn",
+  "title": "エンプティでカメラを回す（親子付け + Track To）",
+  "summary": "カメラを直接 R で回しても首を振るだけで公転しない。被写体の中心にエンプティを置いてカメラをその子にし、Track To で向きを固定すれば、エンプティの回転Zにキーフレーム2個打つだけで周回アニメーションができ、あとからカメラをずらして半径や高さを変えても壊れない。",
+  "mainLabel": "Blender/アニメーションとリギング",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/シーンとオブジェクト"
+  ],
+  "createdAt": "2026-09-27",
+  "updatedAt": "2026-09-27",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_エンプティでカメラを回す.md",
+    "note": "docs/テクニック/TIPS_エンプティでカメラを回す.md を夜間取り込みでページ化したもの"
+  }
+}
