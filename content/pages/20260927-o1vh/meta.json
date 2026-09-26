@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20260927-o1vh",
+  "title": "オイラー角と回転モード（XYZ / クォータニオン）",
+  "summary": "「設定で回転方向が変わる」正体は、オイラー角が3軸を適用する順番の宣言だから。単軸ならオイラーのままでよく、多軸をアニメートするならクォータニオン、最も確実なのはエンプティで軸ごとに分解する方法。",
+  "mainLabel": "Blender/シーンとオブジェクト",
+  "subLabels": [
+    "Blender/知識",
+    "Blender/アニメーションとリギング"
+  ],
+  "createdAt": "2026-09-27",
+  "updatedAt": "2026-09-27",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "知識/KNOW_オイラー角と回転モード.md",
+    "note": "docs/知識/KNOW_オイラー角と回転モード.md を夜間取り込みでページ化したもの"
+  }
+}

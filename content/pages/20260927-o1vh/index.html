@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>オイラー角と回転モード（XYZ / クォータニオン）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・補足カード・SVG 図の面塗りだけ
+         色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+        --accent-fill: #eeddd0;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+          --accent-fill: #3a2a1d;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card p + p {
+        margin-top: 0.7rem;
+      }
+      .card ul.ticks,
+      .card ol.steps {
+        margin: 0.6rem 0 0;
+      }
+
+      /* 番号は position: absolute で置く。li を grid / flex にすると、
+         中に strong や code を挟んだ瞬間に1文字ずつ縦に並ぶ */
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.7rem;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+
+      figure.diagram {
+        max-width: 32rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>オイラー角と回転モード（XYZ / クォータニオン）</h1>
+        <p class="standfirst">
+          「XYZオイラー」「ZYXオイラー」といったモード名は、3軸の回転を<strong>どの順番で適用するかの宣言</strong>。設定によって回転の効き方が変わって見えるのは、これが正体。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >単軸で回すだけなら<strong>オイラーのまま</strong>。多軸を同時にアニメーションさせるなら<strong>クォータニオン</strong>。</span
+        >
+        <p>
+          そして一番強い手は、<strong>エンプティで軸ごとに分解して、1オブジェクトに1軸しか持たせないこと</strong>。順序問題もジンバルロックも原理的に起きなくなる。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Choose</span>どれを選ぶか</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">選ぶもの</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">単軸で回すだけ（ターンテーブル、ドアの開閉など）</th>
+                <td><strong>オイラーのままで何も問題ない。</strong> Zだけ動かす</td>
+              </tr>
+              <tr>
+                <th scope="row">多軸を同時にアニメーションさせる</th>
+                <td><strong>クォータニオンに切り替える</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">そもそも複雑な回転を安全に組みたい</th>
+                <td><strong>エンプティで軸ごとに分解する</strong>（後述）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <p>
+            モードは<strong>後から変更できる</strong>。ただし<strong>キーフレームを打つ前に決めておく</strong>のが安全。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Compare</span>4つの回転モード</h2>
+        <p>
+          Nパネル（または オブジェクトプロパティ &gt; 回転）の「回転モード」で切り替えられる。<strong>切り替えても見た目の向きは変わらない</strong>（内部で変換される）。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">モード</th>
+                <th scope="col">中身</th>
+                <th scope="col">向いている用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">XYZオイラー（と並び替え6種）</th>
+                <td>3軸の角度 + 適用順</td>
+                <td>数値が読める。単軸の回転。ほとんどの場面</td>
+              </tr>
+              <tr>
+                <th scope="row">クォータニオン（WXYZ）</th>
+                <td>4つの数値</td>
+                <td>
+                  <strong>ジンバルロックが起きない。</strong>
+                  補間が最短経路で滑らか。多軸の複雑な回転、ボーン
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">軸角度（Axis Angle）</th>
+                <td>回転軸ベクトル + 角度</td>
+                <td>「この軸で何度」と決まっている場合</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <span class="tag">Trade-off</span>
+          <p>
+            <strong>クォータニオンの弱点は、数値を見ても人間には意味が分からないこと。</strong>
+            「45°回したい」を手入力できない。
+          </p>
+          <p>だから<strong>アニメーション向きで、手動調整には不向き</strong>という住み分けになる。</p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>なぜ順番で結果が変わるのか</h2>
+        <p><strong>回転は掛け算の順序を入れ替えられない（非可換）</strong>から。</p>
+        <p>手元の本やスマホで試すと一発で分かる。</p>
+        <ul class="ticks">
+          <li><strong>パターンA</strong>: X軸に90°倒す → その後 Z軸に90°回す</li>
+          <li><strong>パターンB</strong>: Z軸に90°回す → その後 X軸に90°倒す</li>
+        </ul>
+        <p>
+          <strong>同じ角度なのに、まったく別の向きになる。</strong>
+          移動（平行移動）は順番を変えても同じ場所に着くが、回転は着かない。だから3Dソフトは「順番」を明示する必要がある。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Order</span>Blenderでの実際の挙動</h2>
+        <p>
+          Blenderの「XYZオイラー」は <strong>X → Y → Z の順に適用</strong>される。ここから実用的なルールが出てくる。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 440 200"
+            role="img"
+            aria-label="XYZオイラーの適用順を左から右へ並べた図。最初のXは他の回転に引きずられ、中間のYはジンバルロックの原因になり、最後のZは常にワールドの軸のまま効く。だから大きく回したい軸をリストの最後に置く"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10">
+              <text x="14" y="18" fill="var(--fg-muted)">適用順 →</text>
+
+              <!-- 最初の軸 X -->
+              <rect
+                x="14"
+                y="30"
+                width="118"
+                height="36"
+                rx="6"
+                fill="var(--surface)"
+                stroke="var(--border)"
+              />
+              <text x="73" y="53" text-anchor="middle" fill="var(--fg)" font-size="13" font-weight="700">
+                X
+              </text>
+              <text x="73" y="88" text-anchor="middle" fill="var(--fg-muted)">他の回転に</text>
+              <text x="73" y="104" text-anchor="middle" fill="var(--fg-muted)">引きずられる</text>
+
+              <line x1="136" y1="48" x2="150" y2="48" stroke="var(--fg-muted)" />
+              <polygon points="156,48 148,44 148,52" fill="var(--fg-muted)" />
+
+              <!-- 中間の軸 Y -->
+              <rect
+                x="161"
+                y="30"
+                width="118"
+                height="36"
+                rx="6"
+                fill="var(--surface)"
+                stroke="var(--border)"
+              />
+              <text
+                x="220"
+                y="53"
+                text-anchor="middle"
+                fill="var(--fg)"
+                font-size="13"
+                font-weight="700"
+              >
+                Y
+              </text>
+              <text x="220" y="88" text-anchor="middle" fill="var(--fg-muted)">±90° で</text>
+              <text x="220" y="104" text-anchor="middle" fill="var(--fg-muted)">ジンバルロック</text>
+
+              <line x1="283" y1="48" x2="297" y2="48" stroke="var(--fg-muted)" />
+              <polygon points="303,48 295,44 295,52" fill="var(--fg-muted)" />
+
+              <!-- 最後の軸 Z -->
+              <rect
+                x="308"
+                y="30"
+                width="118"
+                height="36"
+                rx="6"
+                fill="var(--accent-fill)"
+                stroke="var(--accent-line)"
+              />
+              <text
+                x="367"
+                y="53"
+                text-anchor="middle"
+                fill="var(--accent-ink)"
+                font-size="13"
+                font-weight="700"
+              >
+                Z
+              </text>
+              <text x="367" y="88" text-anchor="middle" fill="var(--accent-ink)">常に親（ワールド）</text>
+              <text x="367" y="104" text-anchor="middle" fill="var(--accent-ink)">の軸のまま効く</text>
+
+              <line x1="14" y1="130" x2="426" y2="130" stroke="var(--border)" />
+              <text x="220" y="156" text-anchor="middle" fill="var(--accent-ink)" font-weight="700">
+                一番大きく／頻繁に回したい軸を、リストの最後に置く
+              </text>
+              <text x="220" y="178" text-anchor="middle" fill="var(--fg-muted)">
+                「Zは素直なのに、Xだと変な方向に回る」のはこれが理由
+              </text>
+            </g>
+          </svg>
+          <figcaption>
+            並び順がそのまま「どの軸が安定して効くか」の順位になる。モード名は宣言であって、性質の説明でもある。
+          </figcaption>
+        </figure>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">位置</th>
+                <th scope="col">XYZの場合</th>
+                <th scope="col">性質</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">最後の軸</th>
+                <td>Z</td>
+                <td>
+                  <strong>常に親（ワールド）の軸のまま効く。</strong> 他の回転に影響されない
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">中間の軸</th>
+                <td>Y</td>
+                <td>ジンバルロックの原因になる軸</td>
+              </tr>
+              <tr>
+                <th scope="row">最初の軸</th>
+                <td>X</td>
+                <td><strong>他の回転に引きずられる。</strong> 見た目の軸がどんどんズレる</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>カメラの場合（XYZのままでよい理由）</h3>
+        <p>
+          Blenderのカメラは初期状態で真下を向いているので <code>X = 90°</code> で水平になる。この状態で XYZオイラーなら:
+        </p>
+        <ul class="ticks">
+          <li><code>Z</code> = 左右のパン（ワールドの垂直軸まわり。地面に対して水平に振れる）</li>
+          <li><code>X</code> = 上下のチルト</li>
+        </ul>
+        <p>これがカメラにとって自然な操作になるので、XYZのままでよい。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Risk</span>ジンバルロック</h2>
+        <p>
+          <strong
+            >中間の軸（XYZなら Y）が ±90° になると、1番目と3番目の回転軸が重なって自由度が1つ失われる現象。</strong
+          >
+        </p>
+        <ul class="ticks">
+          <li>2つのスライダーが同じ動きをしてしまい、特定の方向に回せなくなる</li>
+          <li>アニメーションの補間が暴れる（急にぐるっと回る）</li>
+        </ul>
+        <p>
+          静止した向きを決めるだけなら実害は少ないが、<strong>アニメーションさせると致命的</strong>になる。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Best</span>一番おすすめの回避策: エンプティで分解する</h2>
+        <p>そもそも<strong>1つのオブジェクトに複数軸の回転を持たせない</strong>のが最強。</p>
+        <pre><code>エンプティA（Z回転だけ担当）
+  └─ エンプティB（X回転だけ担当）
+        └─ オブジェクト</code></pre>
+        <p>
+          こうすると、各エンプティは1軸しか回らないので<strong>順序問題もジンバルロックも原理的に起きない</strong>。しかもあとから「Z回転だけ速くする」といった調整が独立してできる。
+        </p>
+        <p>カメラワークで Empty を使うテクニックと同じ考え方。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Keys</span>操作面のコツ（Rキー）</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><code>R</code> → <code>Z</code> → <code>45</code></th>
+                <td><strong>ワールド</strong>のZ軸まわりに45°</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>R</code> → <code>Z</code> <code>Z</code>（2回）</th>
+                <td><strong>ローカル</strong>のZ軸まわり</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>R</code> → <code>X</code> <code>X</code></th>
+                <td>ローカルX軸まわり</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          「思った方向に回らない」ときは、ワールド軸とローカル軸を取り違えていることも多い。軸キーを2回押すとローカルに切り替わる。
+        </p>
+        <div class="note">
+          <p>
+            ヘッダーの<strong>トランスフォーム座標系</strong>を「ローカル」にしておくと、ギズモもローカル軸で表示されるので分かりやすくなる。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
