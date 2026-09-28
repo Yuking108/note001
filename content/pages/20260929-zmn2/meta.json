@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20260929-zmn2",
+  "title": "左のツールバーを消す（T キー）",
+  "summary": "3Dビューポート左のツールバーは、ビューポート上にマウスを置いて `T` を押すだけで開閉できる（メニューなら ビュー > ツールバー）。ツールバーは多くのエディター共通のリージョンで、`N` のサイドバー・ギズモ・オーバーレイ・`Ctrl+Space` の全画面化と合わせれば、シーンに影響を与えずスクリーンショット向けのクリーンな画面が作れる。",
+  "mainLabel": "Blender/ユーザーインターフェース",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/エディター"
+  ],
+  "createdAt": "2026-09-29",
+  "updatedAt": "2026-09-29",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A/Q&A_左のツールバーを消す.md",
+    "note": "docs/Q&A/Q&A_左のツールバーを消す.md を夜間取り込みでページ化したもの"
+  }
+}
