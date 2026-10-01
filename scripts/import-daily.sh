@@ -80,18 +80,32 @@ render() {
 }
 
 # claude を時間制限つきで動かし、結果 JSON を $1 に書く。
-# 無人実行なので、応答が返らないまま朝まで居座る事態を防ぐ
+# 無人実行なので、応答が返らないまま朝まで居座る事態を防ぐ。
+# stderr は呼び出しごとに $1.err へ分けて残す（失敗時にまとめて読めるように）
 run_claude() {
   local out_file="$1" limit="$2"; shift 2
   # stdin は必ず切る。開けたままだと、取り込み対象を流している while ループの
   # 入力を claude が飲み込んでしまう
-  claude "$@" >"$out_file" 2>>"$TMP_DIR/claude.err" </dev/null &
+  claude "$@" >"$out_file" 2>"$out_file.err" </dev/null &
   local pid=$!
   ( sleep "$limit"; kill -TERM "$pid" 2>/dev/null ) >/dev/null 2>&1 &
   local watcher=$!
   wait "$pid"; local rc=$?
   { kill "$watcher" && wait "$watcher"; } 2>/dev/null
   return $rc
+}
+
+# claude の呼び出しが失敗したとき、原因をログに残す。
+# これが無いと「時間切れかエラー」としか分からず、認証切れなのか API 障害なのか
+# タイムアウトなのか、翌朝ログを見ても区別がつかない
+dump_claude_failure() {
+  local out_file="$1"
+  if [ -s "$out_file.err" ]; then
+    log "  stderr: $(tail -c 500 "$out_file.err" | tr '\n' ' ')"
+  fi
+  if [ -s "$out_file" ]; then
+    log "  stdout: $(head -c 500 "$out_file" | tr '\n' ' ')"
+  fi
 }
 
 # 取り込み中に散らかしたものを、コミット前の状態まで戻す。
@@ -118,6 +132,26 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 start_commit="$(git rev-parse HEAD)"
+
+# --- claude の認証を確認する ---------------------------------------------
+#
+# 2026-10-01〜10-02、OAuth トークンが期限切れになり、分類も執筆も毎回 5〜9 秒で
+# 即失敗する状態が2晩続いた。launchd は非対話で動くため `/login` の再認証ができず、
+# 失敗の理由も「時間切れかエラー」としか記録されなかったため、気づくまで日数がかかった。
+#
+# ここで安価な呼び出しを1回試し、認証切れなら iCloud やラベル判定に進む前に
+# はっきりした理由で中止する。「毎晩 全件失敗」を繰り返す代わりに、1回で気づけるようにする。
+auth_check="$TMP_DIR/auth-check.json"
+if ! run_claude "$auth_check" 60 \
+  -p "reply with exactly: ok" \
+  --model "$MODEL" \
+  --max-budget-usd 0.1 \
+  --output-format json \
+  --disallowedTools "Bash,Read,Write,Edit,Glob,Grep" ||
+  ! jq -e '.is_error == false' "$auth_check" >/dev/null 2>&1; then
+  dump_claude_failure "$auth_check"
+  abort "claude の認証が切れている可能性があります。ターミナルで \`claude /login\` を実行してください"
+fi
 
 # --- iCloud の実体を落とす ----------------------------------------------
 
@@ -204,12 +238,13 @@ while IFS= read -r md_file; do
     --allowedTools "Read,Glob,Grep" \
     --disallowedTools "Bash,Write,Edit"; then
     log "失敗 $md_file: 分類が終わりませんでした（時間切れかエラー）"
+    dump_claude_failure "$TMP_DIR/classify.json"
     rollback; failed=$((failed + 1)); continue
   fi
   if ! jq -e '.is_error == false and (.structured_output | type) == "object"' \
     "$TMP_DIR/classify.json" >/dev/null 2>&1; then
     log "失敗 $md_file: 分類の結果を読めませんでした"
-    log "$(jq -r '.result // "（出力なし）"' "$TMP_DIR/classify.json" 2>/dev/null | head -3)"
+    dump_claude_failure "$TMP_DIR/classify.json"
     rollback; failed=$((failed + 1)); continue
   fi
 
@@ -275,11 +310,12 @@ while IFS= read -r md_file; do
     --allowedTools "Read,Write,Edit,Glob,Grep" \
     --disallowedTools "Bash"; then
     log "失敗 $md_file: 本文の執筆が終わりませんでした（時間切れかエラー）"
+    dump_claude_failure "$TMP_DIR/write.json"
     rollback; failed=$((failed + 1)); continue
   fi
   if ! jq -e '.is_error == false' "$TMP_DIR/write.json" >/dev/null 2>&1; then
     log "失敗 $md_file: 執筆がエラーで終わりました"
-    log "$(jq -r '.result // "（出力なし）"' "$TMP_DIR/write.json" 2>/dev/null | head -3)"
+    dump_claude_failure "$TMP_DIR/write.json"
     rollback; failed=$((failed + 1)); continue
   fi
 
