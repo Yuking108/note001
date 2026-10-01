@@ -142,15 +142,19 @@ start_commit="$(git rev-parse HEAD)"
 # ここで安価な呼び出しを1回試し、認証切れなら iCloud やラベル判定に進む前に
 # はっきりした理由で中止する。「毎晩 全件失敗」を繰り返す代わりに、1回で気づけるようにする。
 auth_check="$TMP_DIR/auth-check.json"
+# 固定の呼び出しコストだけで $0.17〜0.27 かかる（システムプロンプトのキャッシュ生成分）。
+# ここを小さくしすぎると「予算オーバー」を「認証切れ」と誤診する
+# （実際に 0.1 で試して誤検知したため、$MAX_USD を使う）
 if ! run_claude "$auth_check" 60 \
   -p "reply with exactly: ok" \
   --model "$MODEL" \
-  --max-budget-usd 0.1 \
+  --max-budget-usd "$MAX_USD" \
   --output-format json \
   --disallowedTools "Bash,Read,Write,Edit,Glob,Grep" ||
   ! jq -e '.is_error == false' "$auth_check" >/dev/null 2>&1; then
   dump_claude_failure "$auth_check"
-  abort "claude の認証が切れている可能性があります。ターミナルで \`claude /login\` を実行してください"
+  reason="$(jq -r '.subtype // "不明"' "$auth_check" 2>/dev/null)"
+  abort "claude の呼び出しに失敗しました（${reason}）。認証切れなら、ターミナルで \`claude /login\` を実行してください"
 fi
 
 # --- iCloud の実体を落とす ----------------------------------------------
