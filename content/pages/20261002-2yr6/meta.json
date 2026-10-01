@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "20261002-2yr6",
+  "title": "ベベルが意図しない方向（下）にかかる",
+  "summary": "原因は主に4つで、最も多いのはオブジェクトのスケールが適用されていないこと（Ctrl+A > スケール）。次に Clamp Overlap のオフ、Loop Slide のオン、選択ループの取り違えを順に確認すれば直る。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/モデリング/ベベル",
+    "Blender/シーンとオブジェクト"
+  ],
+  "createdAt": "2026-10-02",
+  "updatedAt": "2026-10-02",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A/Q&A_ベベルが意図しない方向にかかる.md",
+    "note": "docs/Q&A/Q&A_ベベルが意図しない方向にかかる.md を夜間取り込みでページ化したもの"
+  }
+}
