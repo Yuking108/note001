@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20261002-vkqu",
+  "title": "ブーリアンモディファイア",
+  "summary": "ブーリアンは面ではなく「閉じた立体の体積」を計算する集合演算で、平面が切れない・穴あきメッシュや法線の裏返りで失敗するのはすべてここに由来する。差分／和集合／交差の3演算、ソルバー3種、よくある失敗5類型と対処をまとめた。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/知識"
+  ],
+  "createdAt": "2026-10-02",
+  "updatedAt": "2026-10-02",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "知識/KNOW_ブーリアンモディファイア.md",
+    "note": "docs/知識/KNOW_ブーリアンモディファイア.md を夜間取り込みでページ化したもの"
+  }
+}
