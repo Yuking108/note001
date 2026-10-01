@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20261002-it59",
+  "title": "ループカットで角のシャープさを制御する（サポートループ）",
+  "summary": "サブディビジョン時の角のシャープさは、ループの本数ではなく「角からの距離」で決まる。角を立てるだけならベベル（Ctrl+B）、ポリゴンを増やしたくないならクリース（Shift+E）のほうが向く、という使い分けまで含めた手順メモ。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/モデリング/ベベル"
+  ],
+  "createdAt": "2026-10-02",
+  "updatedAt": "2026-10-02",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_ループカットで角のシャープさを制御する.md",
+    "note": "docs/テクニック/TIPS_ループカットで角のシャープさを制御する.md を夜間取り込みでページ化したもの"
+  }
+}
