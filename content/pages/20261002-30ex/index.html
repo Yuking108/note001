@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>押し出しの3種類を使い分ける（E / 法線に沿って / 個別の面）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順リスト・SVG 図の面塗りだけ
+         色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 3列以上で、どの列にも文章が入る表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      td code,
+      th code {
+        white-space: nowrap;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card p + p {
+        margin-top: 0.7rem;
+      }
+      .card ul.ticks {
+        margin: 0.6rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      /* 記号は position: absolute で置く。li を grid / flex にすると、
+         中に strong や code を挟んだ瞬間に1文字ずつ縦に並ぶ */
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 番号付きの手順。番号も absolute で置く（grid / flex は使わない） */
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 0.8rem;
+        line-height: 1.75;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.22em;
+        width: 1.7rem;
+        height: 1.7rem;
+        line-height: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      .hint {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.9rem;
+        line-height: 1.7;
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      figure.diagram {
+        max-width: 36rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>押し出しの3種類を使い分ける（E / 法線に沿って / 個別の面）</h1>
+        <p class="standfirst">
+          <code>E</code> は選択範囲を<strong>ひとかたまりとして、平均法線方向へ</strong>押し出す。円柱の側面のように向きがバラバラな面を<strong>それぞれの方向へ</strong>出したいときは、<code>Alt+E</code> から別の押し出しを選ぶ。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >「円柱の各面をそれぞれの方向に押し出す」なら<strong>個別の面を押し出し</strong>。<code>Alt+E</code> から選ぶのが最短。</span
+        >
+        <p>
+          同じ場面で <code>E</code> を押すと、全方向の平均がほぼゼロになるので<strong>何も起きないか潰れる</strong>。これは不具合ではなく、<code>E</code> がそういう押し出しだというだけ。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Compare</span>3種類の押し出し</h2>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">挙動</th>
+                <th scope="col">円柱の側面を全選択した場合</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">領域（<code>E</code>）</th>
+                <td>選択面を<strong>1枚の板のように</strong>まとめて、平均の法線方向へ移動</td>
+                <td>全方向の平均＝ほぼゼロなので、<strong>何も起きないか潰れる</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">法線に沿って押し出し</th>
+                <td>
+                  ひとかたまりのまま、各部分が<strong>自分の法線方向</strong>へ膨らむ。面は繋がったまま
+                </td>
+                <td><strong>円柱が太くなる</strong>（ソリッド化に近い）</td>
+              </tr>
+              <tr>
+                <th scope="row">個別の面を押し出し</th>
+                <td>
+                  各面が<strong>バラバラに</strong>自分の法線方向へ。面と面の間に側面が新しく作られる
+                </td>
+                <td>各面が独立して飛び出す（歯車・王冠のような形）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 460 190"
+            role="img"
+            aria-label="円柱を真上から見た断面の模式図を3つ並べたもの。領域（E）では面の法線が打ち消し合って動かない。法線に沿ってでは断面が繋がったまま一回り大きくなる。個別の面では各辺が独立して外側へ飛び出し、歯車のような形になる。"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10">
+              <!-- 1: 領域（E）。法線が打ち消し合って動かない -->
+              <polygon
+                points="117,90.3 95.3,112 64.7,112 43,90.3 43,59.7 64.7,38 95.3,38 117,59.7"
+                fill="var(--code-bg)"
+                stroke="var(--fg-muted)"
+                stroke-dasharray="3 3"
+              />
+              <g stroke="var(--accent)" stroke-width="1.5" fill="var(--accent)">
+                <line x1="117" y1="75" x2="135" y2="75" />
+                <polygon points="139,75 131,71.5 131,78.5" stroke="none" />
+                <line x1="43" y1="75" x2="25" y2="75" />
+                <polygon points="21,75 29,71.5 29,78.5" stroke="none" />
+                <line x1="80" y1="38" x2="80" y2="20" />
+                <polygon points="80,16 76.5,24 83.5,24" stroke="none" />
+                <line x1="80" y1="112" x2="80" y2="130" />
+                <polygon points="80,134 76.5,126 83.5,126" stroke="none" />
+              </g>
+              <text x="80" y="156" fill="var(--accent-ink)" text-anchor="middle">領域（E）</text>
+              <text x="80" y="172" fill="var(--fg-muted)" text-anchor="middle">平均 ≒ 0 → 動かない</text>
+
+              <!-- 2: 法線に沿って。繋がったまま一回り太る -->
+              <polygon
+                points="278,94.9 249.9,123 210.1,123 182,94.9 182,55.1 210.1,27 249.9,27 278,55.1"
+                fill="var(--accent-bg)"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+              />
+              <polygon
+                points="267,90.3 245.3,112 214.7,112 193,90.3 193,59.7 214.7,38 245.3,38 267,59.7"
+                fill="var(--code-bg)"
+                stroke="var(--fg-muted)"
+                stroke-dasharray="3 3"
+              />
+              <text x="230" y="156" fill="var(--accent-ink)" text-anchor="middle">法線に沿って</text>
+              <text x="230" y="172" fill="var(--fg-muted)" text-anchor="middle">繋がったまま太る</text>
+
+              <!-- 3: 個別の面。各辺が独立して飛び出す -->
+              <g fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5">
+                <polygon points="417,59.7 417,90.3 430,90.3 430,59.7" />
+                <polygon points="417,90.3 395.3,112 404.5,121.2 426.2,99.5" />
+                <polygon points="395.3,112 364.7,112 364.7,125 395.3,125" />
+                <polygon points="364.7,112 343,90.3 333.9,99.5 355.5,121.2" />
+                <polygon points="343,90.3 343,59.7 330,59.7 330,90.3" />
+                <polygon points="343,59.7 364.7,38 355.5,28.9 333.9,50.5" />
+                <polygon points="364.7,38 395.3,38 395.3,25 364.7,25" />
+                <polygon points="395.3,38 417,59.7 426.2,50.5 404.5,28.9" />
+              </g>
+              <polygon
+                points="417,90.3 395.3,112 364.7,112 343,90.3 343,59.7 364.7,38 395.3,38 417,59.7"
+                fill="var(--code-bg)"
+                stroke="var(--fg-muted)"
+                stroke-dasharray="3 3"
+              />
+              <text x="380" y="156" fill="var(--accent-ink)" text-anchor="middle">個別の面</text>
+              <text x="380" y="172" fill="var(--fg-muted)" text-anchor="middle">各面が独立して出る</text>
+            </g>
+          </svg>
+          <figcaption>
+            円柱を真上から見た断面。点線が元の形。個別の面では、飛び出した面と面の間に新しい側面が作られる。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Steps</span>個別の面を押し出す手順</h2>
+        <p class="hint">前提：編集モードで、押し出したい面が選択されていること。</p>
+        <ol class="steps">
+          <li><code>Alt+E</code> を押す。押し出しメニューが直接開く</li>
+          <li><strong>個別の面を押し出し</strong>を選ぶ</li>
+          <li>
+            マウスを動かして距離を決める。<strong>実行中にそのまま数値をタイプしてもよい</strong>
+          </li>
+          <li>
+            確定後、<code>F9</code> で左下のオペレーターパネルを開き、<strong>「オフセット」</strong>に数値を入れて正確に決める。マウスで決めるより再現性がある
+          </li>
+        </ol>
+
+        <h3>メニューの中身</h3>
+        <pre><code>Alt+E →
+  ├ 領域を押し出し
+  ├ 法線に沿って押し出し
+  ├ 個別の面を押し出し   ← これ
+  ├ 多様体を押し出し
+  └ カーソル方向に押し出し</code></pre>
+
+        <h3>他の呼び出し方</h3>
+        <ul class="ticks">
+          <li><strong>メッシュ &gt; 押し出し</strong> メニュー</li>
+          <li><strong>右クリック</strong>（面コンテキストメニュー）</li>
+          <li>
+            <strong>ツールバー（<code>T</code>）の押し出しアイコンを長押し</strong>
+            → 「個別の面を押し出し」ツールに切り替わる。ギズモをドラッグして操作できる
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Debug</span>結果から今どれを使っているか判別する</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">起きたこと</th>
+                <th scope="col">今使っているもの</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">押しても何も起きない</th>
+                <td><code>E</code>（領域）。<strong>平均法線が打ち消し合っている</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">形が全体に膨らむだけ</th>
+                <td>「法線に沿って押し出し」になっている</td>
+              </tr>
+              <tr>
+                <th scope="row">面が離れてバラバラになる</th>
+                <td>「個別の面」で<strong>正解</strong>。これが狙いの挙動</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Caveats</span>注意点</h2>
+        <ul class="ticks">
+          <li>
+            <strong>ポリゴン数が一気に増える。</strong>
+            「個別の面を押し出し」は面と面の間に新しい側面を作るため
+          </li>
+          <li>
+            <strong>サブディビジョンを掛けると形が崩れやすい。</strong>
+            隣り合う面が離れるため。使うならサポートループかクリースで押さえる
+          </li>
+          <li>
+            <strong>オフセットは控えめに。</strong>
+            円柱の側面など曲率がある場所で大きく押し出すと、側面同士が交差することがある
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Related</span>似た関係にあるインセット</h2>
+        <p>インセット（<code>I</code>）にも同じ区別がある。</p>
+        <ul class="ticks">
+          <li><code>I</code> … 選択範囲を<strong>ひとまとまり</strong>として内側に面を作る</li>
+          <li><code>I</code> を2回 … <strong>各面それぞれに</strong>インセットが入る</li>
+        </ul>
+        <div class="note">
+          <p>押し出しと同じ考え方なので、セットで覚えると混乱しない。</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
