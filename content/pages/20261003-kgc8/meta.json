@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20261003-kgc8",
+  "title": "面を別オブジェクトとして分離する（P / Ctrl+J）",
+  "summary": "編集モードで面を選んで `P` > 選択物で別オブジェクトになる（`P` は切り取りなので、残したいなら `Shift+D` → `Esc` で複製してから分離）。分離後は原点・マテリアルスロット・モディファイアの3点を必ず確認し、戻すときはオブジェクトモードで `Ctrl+J`。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/シーンとオブジェクト"
+  ],
+  "createdAt": "2026-10-03",
+  "updatedAt": "2026-10-03",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_面を別オブジェクトとして分離する.md",
+    "note": "docs/テクニック/TIPS_面を別オブジェクトとして分離する.md を夜間取り込みでページ化したもの"
+  }
+}

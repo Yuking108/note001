@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>面を別オブジェクトとして分離する（P / Ctrl+J）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・SVG 図の色だけ
+         足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        /* 図の中で Blender の選択状態を再現する色 */
+        --ob-line: #6b645d;
+        --ob-fill: #efece9;
+        --sel-face: #f08c23;
+        --sel-fill: #f7dcc1;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --ob-line: #8e8a97;
+          --ob-fill: #2a282f;
+          --sel-face: #ffa94d;
+          --sel-fill: #4a3115;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 3列以上で、どの列にも文章が入る表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 番号は position: absolute で置く。li を grid / flex にすると、
+         中に strong や code を挟んだ瞬間に1文字ずつ縦に並ぶ */
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.7rem;
+      }
+      .hint {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.9rem;
+        line-height: 1.7;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 「→ こうする」の対処行。矢印は absolute で置く */
+      p.fix {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-bottom: 1.1rem;
+      }
+      p.fix::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        width: 1.2rem;
+        text-align: left;
+        color: var(--accent);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      figure.diagram {
+        max-width: 34rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>面を別オブジェクトとして分離する（P / Ctrl+J）</h1>
+        <p class="standfirst">
+          編集モードで選んだ面を、そのまま<strong>独立した別オブジェクト</strong>として抜き出せる。別マテリアルを当てたいパーツ、別々に動かしたいフタやノブを切り出すときの基本操作。戻すのは <code>Ctrl+J</code>。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >編集モードで面を選択して <code>P</code> &gt; <strong>選択物</strong>。これで新しいオブジェクトになる。</span
+        >
+        <p>
+          ただし <code>P</code> は<strong>切り取り</strong>なので、元のオブジェクトからその面は消えて穴があく。元の形も残したいなら、先に <code>Shift+D</code> → <code>Esc</code> で複製してから分離する。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Premise</span>前提</h2>
+        <ul class="ticks">
+          <li><strong>編集モード</strong>で操作する（分離の実行まで）</li>
+          <li>選択の単位は面でなくてもよい。<strong>頂点・辺</strong>でも同じように分離できる</li>
+          <li>結合（<code>Ctrl+J</code>）だけは<strong>オブジェクトモード</strong>の操作</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Steps</span>手順</h2>
+        <ol class="steps">
+          <li><strong>編集モード</strong>で、分離したい面（または頂点・辺）を選択する</li>
+          <li><code>P</code> を押す</li>
+          <li>
+            <strong>選択物（Selection）</strong> を選ぶ
+            <span class="hint">一番よく使う項目。他の2つは下の表</span>
+          </li>
+        </ol>
+        <p>
+          これで選択部分が元のオブジェクトから抜き出され、<strong>新しいオブジェクト</strong>になる。オブジェクトモードに戻ると、アウトライナーに <code>元の名前.001</code> が増えているのが確認できる。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 400 150"
+            role="img"
+            aria-label="分離の前後の模式図。左は1つのオブジェクトで、上面だけがオレンジで選択されている。P を押して選択物を選ぶと、右のように上面が別オブジェクトになり、元のオブジェクトはその面が抜けて穴があいた状態になる。"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10">
+              <!-- 分離前：1つのオブジェクト。上面が選択されている -->
+              <rect
+                x="22"
+                y="38"
+                width="96"
+                height="64"
+                rx="3"
+                fill="var(--ob-fill)"
+                stroke="var(--ob-line)"
+                stroke-width="1.5"
+              />
+              <rect
+                x="22"
+                y="38"
+                width="96"
+                height="22"
+                fill="var(--sel-fill)"
+                stroke="var(--sel-face)"
+                stroke-width="2"
+              />
+              <text x="22" y="122" fill="var(--fg-muted)">1つのオブジェクト</text>
+              <text x="22" y="136" fill="var(--sel-face)">上面を選択中</text>
+
+              <!-- 操作 -->
+              <path
+                d="M 152 70 L 196 70"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+                fill="none"
+                marker-end="url(#ar)"
+              />
+              <defs>
+                <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill="var(--accent)" />
+                </marker>
+              </defs>
+              <text x="150" y="60" fill="var(--accent)">P &gt; 選択物</text>
+
+              <!-- 分離後：面が別オブジェクトに。元には穴があく -->
+              <rect
+                x="238"
+                y="22"
+                width="96"
+                height="22"
+                rx="2"
+                fill="var(--sel-fill)"
+                stroke="var(--sel-face)"
+                stroke-width="2"
+              />
+              <text x="344" y="37" fill="var(--sel-face)">.001</text>
+              <path
+                d="M 238 60 L 238 102 L 334 102 L 334 60"
+                fill="var(--ob-fill)"
+                stroke="var(--ob-line)"
+                stroke-width="1.5"
+              />
+              <path d="M 238 60 L 334 60" stroke="var(--ob-line)" stroke-width="1.5" stroke-dasharray="4 4" />
+              <text x="238" y="122" fill="var(--fg-muted)">元のオブジェクト</text>
+              <text x="238" y="136" fill="var(--fg-muted)">上面が抜けて穴があく</text>
+            </g>
+          </svg>
+          <figcaption>
+            点線が「面が無くなった」部分。<code>P</code> は複製ではなく切り取りなので、ここに穴が残る。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Menu</span><code>P</code> のメニュー3種類</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">選択物</th>
+                <td>選択している部分だけを分離。<strong>一番よく使う</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">マテリアルで</th>
+                <td>マテリアルスロットごとに自動でバラバラに分離</td>
+              </tr>
+              <tr>
+                <th scope="row">構造的に分離したパーツで（Loose Parts）</th>
+                <td>繋がっていない塊ごとに自動分離。ブーリアンや取り込み後の整理に便利</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Keep</span>元の面を残したまま別オブジェクトにしたい</h2>
+        <p>
+          <code>P</code> は切り取りなので、そのままでは元のオブジェクトに穴があく。コピーを作りたいなら、<strong>分離の前に複製する</strong>。
+        </p>
+        <ol class="steps">
+          <li>編集モードで面を選択する</li>
+          <li>
+            <code>Shift+D</code> → <code>Esc</code>
+            <span class="hint">その場に複製。移動させずに確定する</span>
+          </li>
+          <li><code>P</code> &gt; <strong>選択物</strong></li>
+        </ol>
+        <p>これで元の形はそのまま、同じ位置に複製が別オブジェクトとして生まれる。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Pitfalls</span>分離したあとに必ず確認する3つ</h2>
+
+        <h3>1. 原点</h3>
+        <p>
+          <strong>分離したオブジェクトは、元のオブジェクトの原点をそのまま引き継ぐ。</strong> 形は離れた場所にあるのに原点は元の位置、という状態になりやすい。
+        </p>
+        <p class="fix">
+          <strong>オブジェクト &gt; 原点を設定 &gt; 原点をジオメトリへ移動</strong>
+        </p>
+
+        <h3>2. マテリアルスロット</h3>
+        <p>
+          元オブジェクトのスロット構成を<strong>全部引き継ぐ</strong>ので、使っていないマテリアルが大量に残ることがある。
+        </p>
+        <p class="fix">
+          マテリアルプロパティのスロット一覧の下向き矢印（<code>v</code>）&gt; <strong>未使用スロットを削除</strong>
+        </p>
+
+        <h3>3. モディファイア</h3>
+        <p>
+          モディファイアもコピーされる。分離後のオブジェクトに不要なものが付いていないか確認する。特に<strong>ミラーやブーリアンは、原点がずれていると意図しない結果になる</strong>。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Join</span>戻したいとき（結合）</h2>
+        <p>
+          オブジェクトモードで、結合したいオブジェクトを選択し、<strong>最後に残したいほうをアクティブにして</strong> <code>Ctrl+J</code>。
+        </p>
+        <div class="note">
+          <p>
+            アクティブ（<strong>明るいオレンジ</strong>）のオブジェクトに吸収される形で1つになる。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Compare</span>混同しやすい似た操作</h2>
+        <p>
+          「切り離す」には<strong>2つのレベル</strong>がある。ここを区別しておくと迷わない。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">レベル</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><code>P</code>（分離）</th>
+                <td><strong>別オブジェクトになる</strong></td>
+                <td>本項目。アウトライナーに新しい項目が増える</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>Y</code>（分割 / Split）</th>
+                <td>同じオブジェクト内</td>
+                <td>面の繋がりだけ切る。頂点が二重になるが、オブジェクトは1つのまま</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>V</code>（リップ）</th>
+                <td>同じオブジェクト内</td>
+                <td>辺や頂点を裂く。マウスの方向に開く</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>M</code>（マージ）</th>
+                <td>同じオブジェクト内</td>
+                <td>頂点をくっつける。<code>Y</code> や <code>V</code> の逆方向</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          「別オブジェクトとして扱いたい」なら <strong><code>P</code> 一択</strong>。<code>Y</code> だと見た目は切り離れても、オブジェクトとしては1つのままなので、個別に動かしたりマテリアルを分けたりはできない。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Use</span>使いどころ</h2>
+        <ul class="ticks">
+          <li>
+            ブーリアンで作った凹みの底面だけを別パーツにして、別マテリアル（光る部分など）にする
+          </li>
+          <li>
+            開閉するフタ、回転するノブなど、<strong>別々にアニメーションさせたいパーツ</strong>を切り出す
+          </li>
+          <li>複雑なモデルを部品ごとに分けて、編集を軽くする</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
