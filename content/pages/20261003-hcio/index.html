@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ターミナルからレンダリングする（シーン・設定・出力先を指定）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・SVG 図の色だけ
+         足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        /* 図の中で「省かれるもの／レンダリングに回る分」を描き分ける色 */
+        --box-line: #6b645d;
+        --box-fill: #efece9;
+        --gain-line: #f08c23;
+        --gain-fill: #f7dcc1;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --box-line: #8e8a97;
+          --box-fill: #2a282f;
+          --gain-line: #ffa94d;
+          --gain-fill: #4a3115;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+        overflow-wrap: normal;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 3列以上で、どの列にも文章が入る表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 番号は position: absolute で置く。li を grid / flex にすると、
+         中に strong や code を挟んだ瞬間に1文字ずつ縦に並ぶ */
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.7rem;
+      }
+      .hint {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.9rem;
+        line-height: 1.7;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 「→ こうする」の対処行。矢印は absolute で置く */
+      p.fix {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-bottom: 1.1rem;
+      }
+      p.fix::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        width: 1.2rem;
+        text-align: left;
+        color: var(--accent);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+      /* 外すとバグる、の類。左に注意の線を立てる */
+      .note.warn {
+        background: var(--accent-bg);
+        border-color: var(--accent-line);
+        border-left: 3px solid var(--accent);
+        color: var(--accent-ink);
+      }
+
+      figure.diagram {
+        max-width: 34rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      /* ★ 書き換える場所の指し示し */
+      .star {
+        max-width: var(--measure);
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+        margin: 0 0 0.6rem;
+      }
+      .star b {
+        color: var(--accent);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>ターミナルからレンダリングする（シーン・設定・出力先を指定）</h1>
+        <p class="standfirst">
+          Blender の画面を開かずに、<strong>保存済みの .blend の設定のまま</strong>、指定したシーンを指定したフォルダへ書き出す。画面描画に GPU を使わない分だけ速く、レンダリング中に他の作業もしやすい。本番のレンダリングはこちらを基本にしてよい。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >ターミナルを開いたら <strong>パスを登録</strong>（手順1）→ <strong>設定を確認</strong>（手順2）→ <strong>レンダリング</strong>（手順3）。この3つを毎回この順でやる。</span
+        >
+        <p>
+          実行されるのは<strong>保存済みファイルの設定</strong>。Blender で直した内容は <code>⌘ + S</code> しないと一切反映されない。ファイル名やシーン名が変わったときは <b>★</b> の部分だけ書き換えれば使い回せる。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Premise</span>前提</h2>
+        <ul class="ticks">
+          <li>
+            Blender 側で<strong>出力先・ルック・フレーム範囲</strong>を決めて <code>⌘ + S</code> で保存してある
+          </li>
+          <li>
+            ターミナルを開く：<code>⌘ + スペース</code> →「ターミナル」と入力して <code>Enter</code>
+          </li>
+          <li>
+            以降のコマンドはコピーして、ターミナルに <code>⌘ + V</code> で貼り付け、<code>Enter</code>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 1</span>ファイルの場所を登録する</h2>
+        <p>
+          <strong>ターミナルを開くたびに毎回実行する。</strong>
+        </p>
+        <p class="star"><b>★</b> 2行目の <code>FILE=</code> を自分の .blend ファイルのパスに書き換える。</p>
+        <pre><code>BLENDER="/Applications/Blender.app/Contents/MacOS/Blender"
+FILE="/Users/theory/blender/2026_10/w4_speaker/blender/speaker.blend"</code></pre>
+        <ul class="ticks">
+          <li>実行しても<strong>何も表示されないのが正常</strong></li>
+          <li>
+            <strong>ターミナルを閉じると登録は消える。</strong> 開き直したら、もう一度これを実行する
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 2</span>シーンと設定を確認する</h2>
+        <p>表示するだけで、レンダリングはしない。書き換え不要。</p>
+        <pre><code>"$BLENDER" -b "$FILE" --python-expr "
+import bpy
+for s in bpy.data.scenes:
+    r = s.render
+    v = s.view_settings
+    print('&gt;&gt; ===== ' + s.name + ' =====')
+    print('&gt;&gt; エンジン       :', r.engine)
+    print('&gt;&gt; カメラ         :', s.camera.name if s.camera else 'なし')
+    print('&gt;&gt; 解像度         :', r.resolution_x, 'x', r.resolution_y, '(', r.resolution_percentage, '% )')
+    print('&gt;&gt; フレーム       :', s.frame_start, '〜', s.frame_end, '/ fps', r.fps)
+    print('&gt;&gt; 出力形式       :', r.image_settings.file_format)
+    print('&gt;&gt; 出力先         :', bpy.path.abspath(r.filepath))
+    print('&gt;&gt; ルック         :', v.view_transform, '/', v.look)
+    print('&gt;&gt; 出力の色管理   :', r.image_settings.color_management)
+    if r.engine == 'CYCLES':
+        print('&gt;&gt; サンプル数     :', s.cycles.samples)
+" 2&gt;/dev/null | grep '^&gt;&gt;'</code></pre>
+
+        <h3>チェックするところ</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">見るポイント</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">出力先</th>
+                <td>
+                  <strong>シーンごとに別フォルダ</strong>になっているか。同じだと上書きされる。<code>/tmp/</code> のままなら Blender の初期設定
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">フレーム</th>
+                <td>開始と終了が意図どおりか</td>
+              </tr>
+              <tr>
+                <th scope="row">ルック</th>
+                <td>変更した内容になっているか。<strong>ルックはシーンごとの設定</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">出力の色管理</th>
+                <td>
+                  <code>FOLLOW_SCENE</code>（シーンに従う）になっているか。<code>OVERRIDE</code> だとルックとは別の設定で書き出される
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          設定を直すときは、Blender で変更して <code>⌘ + S</code> で保存し、もう一度ここを実行して確認する。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 3</span>レンダリングする</h2>
+
+        <h3>A. 指定したシーンだけ（GPU を使う）</h3>
+        <p class="star"><b>★</b> シーン名の部分を書き換える。数は増やしても減らしてもよい。</p>
+        <pre><code>for SCENE in "Scene_001" "Scene_002" "Scene_003"; do
+  echo "=== Rendering: $SCENE ==="
+  "$BLENDER" -b "$FILE" -S "$SCENE" -a -- --cycles-device METAL
+done</code></pre>
+
+        <h3>B. 全シーン（GPU を使う）</h3>
+        <p>書き換え不要。ファイル内の全シーンを順番にレンダリングする。</p>
+        <pre><code>"$BLENDER" -b "$FILE" --python-expr "import bpy; [print('SCENE:'+s.name) for s in bpy.data.scenes]" 2&gt;/dev/null \
+| grep '^SCENE:' | sed 's/^SCENE://' \
+| while IFS= read -r SCENE; do
+    echo "=== Rendering: $SCENE ==="
+    "$BLENDER" -b "$FILE" -S "$SCENE" -a -- --cycles-device METAL &lt; /dev/null
+  done</code></pre>
+        <div class="note warn">
+          <p>
+            <strong><code>&lt; /dev/null</code> は外さないこと。</strong> これがないと最初のシーンだけで止まる。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">While running</span>レンダリング中と完了後</h2>
+        <ul class="ticks">
+          <li><code>Saved: '...0001.png'</code> と出るたびに1枚保存されている</li>
+          <li>
+            最後に入力待ちの行（<code>theory ~ ❯</code>）に戻ったら<strong>すべて完了</strong>
+          </li>
+          <li>
+            <strong>ターミナルは閉じない。Mac はスリープさせない。</strong> MacBook なら電源につないでおく
+          </li>
+          <li>途中でやめたいときは <code>control + C</code>（止め方は次の節）</li>
+          <li>
+            <strong>同じフォルダに前回の画像があると上書きされる。</strong> 残したい画像は先に移動しておく
+          </li>
+          <li>
+            レンダリング中に別の作業をしたいときは <code>⌘ + N</code> で新しいターミナルを開く。新しいターミナルでは<strong>手順1をもう一度実行する</strong>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Stop</span>途中で止める</h2>
+        <p>止め方は3つ。<strong>上から順に試す。</strong></p>
+
+        <h3>方法1: <code>control + C</code> を何回か押す</h3>
+        <p>
+          <code>control + C</code> を、<strong>1回押すごとに2〜3秒待ちながら</strong>、ターミナルが <code>theory ~ ❯</code> の行に戻るまで押す。
+        </p>
+        <p>
+          <strong>1回では止まらないことが多い。</strong> 今レンダリング中のシーンだけが止まり、次のシーンが始まってしまう。
+        </p>
+
+        <h3>方法2: ターミナルのウィンドウを閉じる（いちばん確実）</h3>
+        <ol class="steps">
+          <li>ターミナルをクリックして <code>⌘ + W</code></li>
+          <li>「終了しますか？」と聞かれたら <strong>「終了」</strong></li>
+        </ol>
+        <p>
+          ウィンドウを閉じれば、中で動いているレンダリングも一緒に止まる。<strong>確実に止めたいときはこれ。</strong>
+        </p>
+
+        <h3>方法3: 新しいターミナルから止める</h3>
+        <p><code>⌘ + N</code> で新しいターミナルを開いて、次を貼り付ける。</p>
+        <pre><code>pkill -f "Blender -b"</code></pre>
+        <p>
+          これは<strong>ターミナルから動かしている Blender だけ</strong>を止める。画面で開いている Blender は閉じない。
+        </p>
+        <p>
+          ただし、<strong>元のウィンドウはまだ次のシーンを始めることがある</strong>ので、そのあと元のウィンドウを方法2で閉じる。
+        </p>
+
+        <h3>止まったか確認する</h3>
+        <p>新しいターミナルで次を実行する。</p>
+        <pre><code>pgrep -fl "Blender -b"</code></pre>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">結果</th>
+                <th scope="col">意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">何も表示されない</th>
+                <td>すべて止まっている</td>
+              </tr>
+              <tr>
+                <th scope="row">何か表示される</th>
+                <td>まだ動いている → 上の <code>pkill</code> をもう一度実行</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>なぜ <code>control + C</code> 1回で止まらないのか</h3>
+        <p>
+          <code>control + C</code> を押すと、Blender は<strong>今のレンダリングだけを止めて「普通に終了した」ように振る舞う。</strong> そのためターミナル側は「正常に終わった、次のシーンへ進もう」と判断してしまう。
+        </p>
+        <p>
+          <strong>ループで複数シーンを順番に回しているとき</strong>によく起きる動き。シーンを1つだけレンダリングしているときは、1回で止まることが多い。
+        </p>
+
+        <h3>止めたあとの確認</h3>
+        <p>
+          中断すると、<strong>最後のフレームが書き出されていない、または途中で終わっている</strong>可能性がある。再開する前に、出力フォルダの<strong>最後の画像を開いて確認</strong>し、おかしければ削除してからレンダリングし直す。
+        </p>
+        <p class="fix">
+          途中から再開したいときは <code>-s</code>（開始フレーム）で続きの番号を指定する。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Options</span>よく使うオプション</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">書き方</th>
+                <th scope="col">意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><code>-b</code></th>
+                <td>画面を開かずに実行する（<strong>必ず最初に書く</strong>）</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-S 名前</code></th>
+                <td>シーンを指定する</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-a</code></th>
+                <td>アニメーション全体をレンダリングする</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-f 10</code></th>
+                <td><code>-a</code> の代わりに使うと、10フレーム目だけ静止画で出力</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-s 1 -e 24</code></th>
+                <td>1〜24フレームだけレンダリング</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-o パス/####</code></th>
+                <td>出力先を一時的に変える</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-F PNG</code></th>
+                <td>出力形式を一時的に変える</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>-- --cycles-device METAL</code></th>
+                <td>Cycles を Mac の GPU で動かす（<strong>コマンドの一番最後</strong>）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note warn">
+          <p>
+            <strong>オプションの順番</strong>：<code>-S</code> <code>-o</code> <code>-s</code> <code>-e</code> <code>-F</code> は、必ず <code>-a</code> や <code>-f</code> <strong>より前</strong>に書く。
+          </p>
+        </div>
+
+        <h3>例: 出力先とフレーム範囲を一時的に変える</h3>
+        <pre><code>"$BLENDER" -b "$FILE" -S "Scene_001" -o "/Users/theory/Desktop/test/frame_####" -F PNG -s 1 -e 24 -a -- --cycles-device METAL</code></pre>
+
+        <h3>例: 1フレームだけ試し出し</h3>
+        <pre><code>"$BLENDER" -b "$FILE" -S "Scene_001" -f 1 -- --cycles-device METAL</code></pre>
+      </section>
+
+      <section>
+        <h2><span class="lead">Pitfalls</span>つまずきやすい点</h2>
+        <ul class="ticks">
+          <li>
+            <strong>保存していない変更は一切反映されない。</strong> 一番やりがちなミス。実行前に必ず <code>⌘ + S</code>
+          </li>
+          <li>
+            途中経過が見えないので、<strong>設定ミスに気づくのが最後になる</strong>。手順2の確認を挟むのはこのため
+          </li>
+          <li>
+            <code>control + C</code> は<strong>全体が止まる</strong>。1フレームだけ中断はできない
+          </li>
+          <li>
+            <strong>ターミナルを閉じるとパスの登録が消える。</strong> 新しいウィンドウでは手順1から
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why faster</span>なぜ速いのか</h2>
+        <p>
+          よくある誤解だが、<strong>バックグラウンド（<code>-b</code>）でも画像そのものはきちんとレンダリングされている。</strong> 省かれているのは「レンダリング」ではなく <strong>Blender の画面（GUI）の描画</strong>。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 400 136"
+            role="img"
+            aria-label="画面から実行した場合とターミナルから実行した場合の、GPU と VRAM の使われ方の模式図。画面から実行するとビューポートの描画とビューポートが抱えるシーンデータに資源が取られ、レンダリングに回る分が狭い。ターミナルから実行すると、その分がすべてレンダリングに回る。"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="9">
+              <!-- 画面から実行：GUI に取られる -->
+              <text x="14" y="22" fill="var(--fg-muted)">画面から実行</text>
+              <rect
+                x="14"
+                y="30"
+                width="372"
+                height="26"
+                rx="3"
+                fill="var(--box-fill)"
+                stroke="var(--box-line)"
+                stroke-width="1.2"
+              />
+              <line x1="146" y1="30" x2="146" y2="56" stroke="var(--box-line)" stroke-width="1.2" />
+              <text x="24" y="47" fill="var(--fg-muted)">GUI / ビューポート / VRAM</text>
+              <text x="156" y="47" fill="var(--fg-muted)">レンダリング</text>
+
+              <!-- ターミナルから実行：全部レンダリングに回る -->
+              <text x="14" y="86" fill="var(--gain-line)">ターミナルから実行（-b）</text>
+              <rect
+                x="14"
+                y="94"
+                width="372"
+                height="26"
+                rx="3"
+                fill="var(--gain-fill)"
+                stroke="var(--gain-line)"
+                stroke-width="1.6"
+              />
+              <text x="24" y="111" fill="var(--gain-line)">レンダリング（空いた分がそのまま回る）</text>
+            </g>
+          </svg>
+          <figcaption>
+            左側の帯がそのままレンダリング側に移る、というイメージ。帯の長さは配分の目安で、実測値ではない。
+          </figcaption>
+        </figure>
+
+        <p>省かれるのは具体的に次のもの。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">省かれるもの</th>
+                <th scope="col">効果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ビューポートや UI の描画</th>
+                <td>その分の GPU / CPU がレンダリングに回る</td>
+              </tr>
+              <tr>
+                <th scope="row">ビューポートが抱えているシーンデータ（VRAM）</th>
+                <td>
+                  <strong>空いた VRAM をレンダリングに使える。ここが一番大きい</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">レンダリング途中経過の画面表示</th>
+                <td>毎フレームの表示更新コストがなくなる</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>効果の大きさ</h3>
+        <ul class="ticks">
+          <li>通常は <strong>数%〜十数%程度</strong>。劇的に速くなるわけではない</li>
+          <li>
+            ただし <strong>VRAM が足りていなかった場合は効果が大きい。</strong> GPU メモリに収まらず CPU に落ちていた／エラーで止まっていたシーンが、GUI を閉じた分の余裕で GPU のまま通ることがある
+          </li>
+          <li>重いシーン・長いアニメーションほど、積み重なって差が出る</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Use GUI</span>画面から実行したほうがよい場面</h2>
+        <p>ターミナルが常に優れているわけではない。次の場合は Blender の画面から実行するほうが速く済む。</p>
+        <ul class="ticks">
+          <li>
+            <strong>1フレームだけ試し出しして、すぐ見たい</strong>とき（レンダー結果ウィンドウでそのまま確認できる）
+          </li>
+          <li>
+            構図やライティングを<strong>詰めている最中</strong>（保存 → ターミナル実行の往復が無駄になる）
+          </li>
+          <li>途中経過を見ながら<strong>サンプル数を判断したい</strong>とき</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Notes</span>メモ</h2>
+        <h3>画面から押すときも GPU を使うには</h3>
+        <p>次の2か所を確認する。</p>
+        <ul class="ticks">
+          <li>レンダープロパティ → デバイス → <strong>GPU演算</strong></li>
+          <li>
+            編集 → プリファレンス → システム → Cycles レンダーデバイス → <strong>Metal</strong>
+          </li>
+        </ul>
+
+        <h3>ルック（コントラストなど）</h3>
+        <div class="note">
+          <p>
+            保存済みで、出力の色管理が「シーンに従う」なら、ターミナルからのレンダリングにも反映される。PNG ならそのまま画像に焼き込まれる。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

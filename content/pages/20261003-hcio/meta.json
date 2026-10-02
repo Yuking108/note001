@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20261003-hcio",
+  "title": "ターミナルからレンダリングする（シーン・設定・出力先を指定）",
+  "summary": "保存済みの .blend を `-b` でバックグラウンド実行すれば、GUI 描画と VRAM が空く分だけ画面から実行するより速く、複数シーンを順番にレンダリングできる。パスの登録 → 設定確認 → `-S` でシーン指定の3手順と、`control + C` 1回では止まらない中断方法までを手順としてまとめたもの。",
+  "mainLabel": "Blender/高度な設定",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/レンダリング"
+  ],
+  "createdAt": "2026-10-03",
+  "updatedAt": "2026-10-03",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_ターミナルからレンダリングする.md",
+    "note": "docs/テクニック/TIPS_ターミナルからレンダリングする.md を夜間取り込みでページ化したもの"
+  }
+}
