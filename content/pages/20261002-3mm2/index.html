@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>長円（両端が半円・間が直線）の作り方</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順リスト・SVG 図の面塗りだけ
+         色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 3列以上で、どの列にも文章が入る表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      td code,
+      th code {
+        white-space: nowrap;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card p + p {
+        margin-top: 0.7rem;
+      }
+      .card ul.ticks {
+        margin: 0.6rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      /* 記号は position: absolute で置く。li を grid / flex にすると、
+         中に strong や code を挟んだ瞬間に1文字ずつ縦に並ぶ */
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 番号付きの手順。番号も absolute で置く（grid / flex は使わない） */
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 0.8rem;
+        line-height: 1.75;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.22em;
+        width: 1.7rem;
+        height: 1.7rem;
+        line-height: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      .hint {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.9rem;
+        line-height: 1.7;
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      figure.diagram {
+        max-width: 36rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>長円（両端が半円・間が直線）の作り方</h1>
+        <p class="standfirst">
+          両端が<strong>きれいな半円</strong>で、その間が<strong>直線</strong>でつながった形。スタジアム形、オブラウンド、角丸スリットなどと呼ばれる。スピーカーのコントロールパネルの凹み、ティッシュ箱の取り出し口、ボタンの座ぐりなど、プロダクト系で非常によく出てくる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >形が決まっているなら、<strong>円の頂点を半分だけ選んで <code>G</code> &gt; <code>X</code> で横にずらす</strong>。これだけで長円になる。</span
+        >
+        <p>
+          あとから直線部分の長さを変えたいなら<strong>ミラー＋クリッピング</strong>、丸みの量を自由に決めたいなら<strong>四角形の頂点ベベル</strong>。どの方法でも、<strong>円をスケールで引き伸ばしてはいけない</strong>（それは楕円になる）。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Why</span>楕円とは別物</h2>
+        <p>
+          楕円は全周が曲率変化する曲線で、長円は「半円＋直線＋半円＋直線」。円を引き伸ばす（スケール）と楕円になってしまい、<strong>端の丸みが崩れる</strong>。プロダクトらしい「きちんとした感じ」が消えるので、スケールで作ってはいけない。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 460 170"
+            role="img"
+            aria-label="左右に2つの形を並べた模式図。左は長円で、両端が半円、その間の上下が直線になっており、半円と直線の継ぎ目に点線が入っている。右は同じ縦横比の楕円で、全周が切れ目なく曲がり続けている。"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10">
+              <!-- 左：長円（半円＋直線＋半円＋直線） -->
+              <path
+                d="M 60,30 H 140 A 40 40 0 0 1 140,110 H 60 A 40 40 0 0 1 60,30 Z"
+                fill="var(--accent-bg)"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+              />
+              <g stroke="var(--fg-muted)" stroke-dasharray="3 3">
+                <line x1="60" y1="22" x2="60" y2="118" />
+                <line x1="140" y1="22" x2="140" y2="118" />
+              </g>
+              <text x="100" y="74" fill="var(--accent-ink)" text-anchor="middle">直線</text>
+              <text x="36" y="74" fill="var(--fg-muted)" text-anchor="middle">半円</text>
+              <text x="164" y="74" fill="var(--fg-muted)" text-anchor="middle">半円</text>
+              <text x="100" y="142" fill="var(--accent-ink)" text-anchor="middle">長円（狙いの形）</text>
+              <text x="100" y="158" fill="var(--fg-muted)" text-anchor="middle">半円＋直線＋半円＋直線</text>
+
+              <!-- 右：楕円（円をスケールした結果） -->
+              <ellipse
+                cx="330"
+                cy="70"
+                rx="80"
+                ry="40"
+                fill="var(--code-bg)"
+                stroke="var(--fg-muted)"
+                stroke-width="1.5"
+              />
+              <text x="330" y="142" fill="var(--fg-muted)" text-anchor="middle">楕円（スケールの結果）</text>
+              <text x="330" y="158" fill="var(--fg-muted)" text-anchor="middle">全周が曲率変化＝端が崩れる</text>
+            </g>
+          </svg>
+          <figcaption>
+            左の長円は、点線の位置で半円と直線が切り替わる。右は円をそのまま横に伸ばしたもので、端にも曲率変化が残る。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Choose</span>3つの方法の使い分け</h2>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">方法</th>
+                <th scope="col">やること</th>
+                <th scope="col">選ぶ場面</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">円の半分をずらす</th>
+                <td>円の片側半分の頂点を選んで横に移動するだけ</td>
+                <td><strong>最速。形が決まっているならこれで十分</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">ミラーモディファイア</th>
+                <td>円を半分にして移動し、ミラー＋クリッピングで中央を閉じる</td>
+                <td>
+                  <strong>非破壊</strong>。左右対称が保証され、直線部分の長さをあとから変えられる
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">四角形の頂点ベベル</th>
+                <td>平面を横に伸ばし、4頂点を <code>Ctrl+Shift+B</code> でベベル</td>
+                <td><strong>丸みの量を自由に決めたい</strong>とき。角丸長方形も同じ手順</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Fastest</span>方法B：円の半分をずらすだけ</h2>
+        <ol class="steps">
+          <li><code>Shift+A</code> &gt; メッシュ &gt; 円。<strong>頂点数は偶数にする</strong></li>
+          <li>
+            編集モードで、<strong>片側半分の頂点だけを選択</strong>する
+            <span class="hint"
+              >透過表示（<code>Alt+Z</code>）をオンにしてボックス選択すると、裏側の頂点も一緒に取れる</span
+            >
+          </li>
+          <li><code>G</code> &gt; <code>X</code> で横に移動</li>
+        </ol>
+        <p>
+          これだけで長円になる。両端は元の円のまま＝きれいな半円、間が直線になる。削除もミラーも要らないので速い。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Steps</span>方法A：ミラーモディファイアを使う</h2>
+        <ol class="steps">
+          <li>
+            <code>Shift+A</code> &gt; メッシュ &gt; 円 を追加
+            <span class="hint"
+              >追加直後の左下パネルで<strong>頂点数</strong>を決めておく。32程度が扱いやすい（あとから増やせない）</span
+            >
+          </li>
+          <li>
+            <strong>編集モード</strong>に入り、<strong>頂点選択モード</strong>で左右どちらか半分を削除（<code>X</code>
+            &gt; 頂点）
+          </li>
+          <li>
+            残った半分を<strong>そのまま左右へ移動</strong>
+            <span class="hint"
+              >必ず編集モードで移動する。オブジェクトモードで動かすと原点ごと動いてしまい、ミラーの基準がずれて次で失敗する</span
+            >
+          </li>
+          <li><strong>ミラーモディファイア</strong>を追加し、<strong>クリッピング</strong>をオンにする</li>
+          <li>
+            半円の端の頂点を選択して <code>E</code> で中心方向へ押し出す
+            <span class="hint"
+              >クリッピングが効いているので、<strong>ミラー平面に到達した頂点はそこに張り付いて止まる</strong>。これで中央がぴったり閉じる</span
+            >
+          </li>
+        </ol>
+
+        <h3>編集モードでも結果を見る</h3>
+        <p>
+          モディファイアパネル上部のアイコンのうち<strong>「編集モードで表示」</strong>をオンにすると、編集モード中もミラーの結果が見える。さらに隣の<strong>「ケージ上で表示」</strong>もオンにすると、ミラーされた側の形に合わせて編集できる。これを知っていればオブジェクトモードに戻って確認する必要がない。
+        </p>
+
+        <div class="card">
+          <span class="tag">Upside</span>
+          <ul class="ticks">
+            <li>左右対称が<strong>保証される</strong></li>
+            <li>
+              ミラーを適用するまで、<strong>直線部分の長さをあとから変えられる</strong>（半分を選んで移動し直すだけ）
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Bevel</span>方法C：四角形の頂点ベベル</h2>
+        <ol class="steps">
+          <li>
+            平面（Plane）を追加し、作りたい長円の<strong>直線部分の長さ</strong>に合わせて横に伸ばす
+          </li>
+          <li>編集モードで<strong>4頂点すべてを選択</strong></li>
+          <li><code>Ctrl+Shift+B</code>（頂点ベベル）</li>
+          <li>マウスホイールか操作パネルで<strong>セグメント数</strong>を増やす</li>
+        </ol>
+        <p>
+          幅の半分までベベルを広げると、両端がちょうど半円になる。途中で止めれば角丸長方形になるので、丸みの量を自由に決めたいときはこちら。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Next</span>作ったあとの流れ（パネルの凹みにする場合）</h2>
+        <ol class="steps">
+          <li>
+            長円の輪郭ができたら、<code>F</code> で面を張る
+            <span class="hint"
+              >きれいな四角面にしたいなら、全選択して <strong>面 &gt; グリッドフィル</strong></span
+            >
+          </li>
+          <li><code>E</code> で押し出して厚みを付け、閉じた立体にする</li>
+          <li>
+            パネル側に<strong>ブーリアン（差分）</strong>で当てて凹ませる
+            <span class="hint">貫通させる場合は確実にはみ出させる</span>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Caveats</span>つまずきやすい点</h2>
+        <ul class="ticks">
+          <li>
+            <strong>スケールで引き伸ばさない。</strong>
+            端が楕円になって、プロダクトらしい「きちんとした感じ」が消える
+          </li>
+          <li>
+            <strong>円の頂点数は最初に決める。</strong>
+            少なすぎるとカクカク、多すぎると後の編集が重い。サブディビジョンを掛ける前提なら少なめでよい
+          </li>
+          <li>
+            <strong>方法Aでミラーを使ったら、適用するまで原点を動かさない。</strong>
+            原点がずれるとミラー位置もずれる
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
