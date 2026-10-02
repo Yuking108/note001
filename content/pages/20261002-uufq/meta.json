@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "20261002-uufq",
+  "title": "SVGを取り込んでメッシュにする",
+  "summary": "SVG はカーブとして入ってくるので、すぐメッシュ化せずカーブプロパティの押し出し・ベベル・解像度プレビューU（12→4〜6）を詰めてから「オブジェクト > 変換 > メッシュ」が正解。取り込み直後は拡大とスケール適用、原点をジオメトリへ、`Ctrl+J` 結合の3点を直し、SVG 側ではストロークのパス化とテキストのアウトライン化を済ませておく。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/ファイルとデータ",
+    "Blender/シーンとオブジェクト"
+  ],
+  "createdAt": "2026-10-02",
+  "updatedAt": "2026-10-02",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_SVGを取り込んでメッシュにする.md",
+    "note": "docs/テクニック/TIPS_SVGを取り込んでメッシュにする.md を夜間取り込みでページ化したもの"
+  }
+}

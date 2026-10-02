@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SVGを取り込んでメッシュにする</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順リスト・SVG 図の面塗りだけ
+         色を足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --shadow: 0 1px 2px rgba(28, 26, 24, 0.05), 0 8px 24px -16px rgba(28, 26, 24, 0.22);
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 3列以上で、どの列にも文章が入る表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      .card {
+        margin-top: 2.5rem;
+        padding: 1.4rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+      }
+      .card .tag {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+      }
+      .card p {
+        margin: 0;
+        max-width: none;
+      }
+      .card p + p {
+        margin-top: 0.7rem;
+      }
+      .card ul.ticks {
+        margin: 0.6rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      /* 記号は position: absolute で置く。li を grid / flex にすると、
+         中に strong や code を挟んだ瞬間に1文字ずつ縦に並ぶ */
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 番号付きの手順。番号も absolute で置く（grid / flex は使わない） */
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 0.8rem;
+        line-height: 1.75;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.22em;
+        width: 1.7rem;
+        height: 1.7rem;
+        line-height: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      .hint {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.9rem;
+        line-height: 1.7;
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      .path {
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        padding: 0.8rem 1rem;
+        margin: 1.2rem 0;
+        max-width: var(--measure);
+        overflow-wrap: anywhere;
+      }
+
+      figure.diagram {
+        max-width: 36rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict,
+        .card {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>SVGを取り込んでメッシュにする</h1>
+        <p class="standfirst">
+          ロゴ、アイコン、文字、刻印などを<strong>正確な形のまま</strong>Blenderに持ち込む方法。Illustrator・Inkscape・Figma で作ったベクターをそのまま3Dに使える。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >SVGは<strong>カーブとして</strong>入ってくる。<strong>すぐメッシュにしないこと</strong>——厚み・ベベル・分割数をカーブのまま数値で調整できる。</span
+        >
+        <p>
+          メッシュ化する前に必ず<strong>シェイプ &gt; 解像度プレビューU</strong>を 4〜6
+          に落とす。デフォルトの12は多くの場合細かすぎて、変換後に頂点を減らすのは面倒。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Import</span>取り込み方</h2>
+        <div class="path">ファイル &gt; インポート &gt; Scalable Vector Graphics (.svg)</div>
+        <p>
+          SVGはベクター（ベジェ曲線）なので、Blenderでも<strong>カーブオブジェクト</strong>として入る。メッシュにしたい場合は変換が必要だが、カーブのままのほうができることが多い。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 460 128"
+            role="img"
+            aria-label="取り込みの流れを示す模式図。左の「SVG（塗りのみ）」から右の「カーブオブジェクト」へ矢印が伸び、カーブの段では押し出し・ベベル・解像度を非破壊で調整できる。そこからさらに右の「メッシュ」へ矢印が伸び、こちらは一方通行であることが示されている。"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10">
+              <rect
+                x="8"
+                y="34"
+                width="104"
+                height="40"
+                rx="6"
+                fill="var(--code-bg)"
+                stroke="var(--fg-muted)"
+                stroke-width="1.2"
+              />
+              <text x="60" y="51" fill="var(--fg)" text-anchor="middle">SVG</text>
+              <text x="60" y="65" fill="var(--fg-muted)" text-anchor="middle">塗りのみ有効</text>
+
+              <rect
+                x="166"
+                y="34"
+                width="128"
+                height="40"
+                rx="6"
+                fill="var(--accent-bg)"
+                stroke="var(--accent)"
+                stroke-width="1.5"
+              />
+              <text x="230" y="51" fill="var(--accent-ink)" text-anchor="middle">カーブ</text>
+              <text x="230" y="65" fill="var(--accent-ink)" text-anchor="middle">押し出し／ベベル／解像度</text>
+              <text x="230" y="92" fill="var(--fg-muted)" text-anchor="middle">ここで作り込む（非破壊）</text>
+
+              <rect
+                x="348"
+                y="34"
+                width="104"
+                height="40"
+                rx="6"
+                fill="var(--code-bg)"
+                stroke="var(--fg-muted)"
+                stroke-width="1.2"
+              />
+              <text x="400" y="51" fill="var(--fg)" text-anchor="middle">メッシュ</text>
+              <text x="400" y="65" fill="var(--fg-muted)" text-anchor="middle">変換後は戻せない</text>
+
+              <g stroke="var(--fg-muted)" stroke-width="1.2" fill="none">
+                <path d="M 116,54 H 158" />
+                <path d="M 152,49 L 160,54 L 152,59" fill="var(--fg-muted)" stroke="none" />
+                <path d="M 298,54 H 340" />
+                <path d="M 334,49 L 342,54 L 334,59" fill="var(--fg-muted)" stroke="none" />
+              </g>
+              <text x="320" y="24" fill="var(--fg-muted)" text-anchor="middle">一方通行</text>
+            </g>
+          </svg>
+          <figcaption>
+            カーブの段で押し出し・ベベル・解像度を決めてから、最後にメッシュへ変換する。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Before</span>前提：SVGを用意する側で済ませておくこと</h2>
+        <p>
+          Blenderのインポーターは<strong>塗り（fill）しか見ない。</strong>線（stroke）やフォント情報はそのままでは形状にならない。元のアプリで次を済ませてから書き出す。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">やること</th>
+                <th scope="col">Illustrator</th>
+                <th scope="col">Inkscape</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ストロークをパス化</th>
+                <td>オブジェクト &gt; パス &gt; パスのアウトライン</td>
+                <td>パス &gt; ストロークをパスに変換</td>
+              </tr>
+              <tr>
+                <th scope="row">テキストをアウトライン化</th>
+                <td>書式 &gt; アウトラインを作成</td>
+                <td>パス &gt; オブジェクトをパスへ</td>
+              </tr>
+              <tr>
+                <th scope="row">重なったパスを合成</th>
+                <td>パスファインダーで合体</td>
+                <td>パスの合体</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          重なりの整理は、Blender側でやるよりベクターソフトで合体しておくほうが<strong>はるかに楽</strong>。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Steps</span>取り込み直後にやること</h2>
+        <ol class="steps">
+          <li>
+            <strong>拡大する。</strong>SVGは非常に小さいサイズ（数センチ〜数ミリ程度）で入ってくる。全部選択して
+            <code>S</code> で拡大する
+            <span class="hint"
+              >親子関係がないなら、拡大後に <code>Ctrl+A</code> &gt; スケールを適用しておく</span
+            >
+          </li>
+          <li>
+            <strong>原点を直す。</strong>各オブジェクトの原点はすべてワールド原点(0,0,0)に置かれる。形は離れた場所にあるのに原点だけ原点にある状態になるので、<strong>オブジェクト
+            &gt; 原点を設定 &gt; 原点をジオメトリへ移動</strong>
+          </li>
+          <li>
+            <strong>結合する。</strong>SVG内のパスごとに別オブジェクトとして入ってくる。1つのロゴとして扱うなら全部選択して
+            <code>Ctrl+J</code>
+            <span class="hint"
+              >穴あき文字（Oや8の内側）は、同じオブジェクト内にないと穴にならない。結合してから塗りつぶす</span
+            >
+          </li>
+        </ol>
+        <div class="note">
+          <p>
+            サイズ感がどうしても合わないときは、<code>N</code>
+            パネルで寸法（ディメンション）を直接入力すると早い。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Curve</span>カーブのままできること（非破壊）</h2>
+        <p>カーブプロパティ（緑のカーブアイコン）から設定する。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ジオメトリ &gt; 押し出し</th>
+                <td>厚みを付ける。数値でいつでも変えられる</td>
+              </tr>
+              <tr>
+                <th scope="row">ジオメトリ &gt; ベベル &gt; 深度</th>
+                <td>縁に丸みを付ける。面取りされたロゴになる</td>
+              </tr>
+              <tr>
+                <th scope="row">シェイプ &gt; 解像度プレビューU</th>
+                <td>曲線の分割数。<strong>メッシュ化後の頂点数を決める重要な設定</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">シェイプ &gt; 塗りつぶしモード</th>
+                <td>「両方」にすると表裏に面が張られる</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Convert</span>メッシュに変換する</h2>
+        <p>
+          オブジェクトモードで <strong>オブジェクト &gt; 変換 &gt; メッシュ</strong>。
+        </p>
+        <p>
+          <strong>変換する前に「解像度プレビューU」を調整しておくこと。</strong>デフォルトは12で、多くの場合これは細かすぎる。4〜6程度に落としてから変換すると、頂点数の少ないきれいなメッシュになる。変換後に減らすのは面倒。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Recipe</span>よくある使い方：ロゴをパネルに刻む</h2>
+        <ol class="steps">
+          <li>SVGをインポート</li>
+          <li>拡大、原点を整える、<code>Ctrl+J</code> で結合</li>
+          <li>
+            カーブプロパティで<strong>押し出し</strong>を設定して厚みを出す
+            <span class="hint">貫通させたいなら十分な厚さに</span>
+          </li>
+          <li><strong>オブジェクト &gt; 変換 &gt; メッシュ</strong></li>
+          <li>パネル側に<strong>ブーリアン（差分）</strong>で当てて凹ませる</li>
+        </ol>
+        <p>
+          ブーリアンを使うので、<strong>閉じた立体になっているか</strong>（押し出しで厚みがあるか）を必ず確認する。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Caveats</span>つまずきやすい点</h2>
+        <ul class="ticks">
+          <li>
+            <strong>ストロークだけのSVGは何も入ってこない。</strong>
+            塗りしか見られないので、書き出す前にパス化する
+          </li>
+          <li>
+            <strong>メッシュ化後のトポロジーは三角形とN-gonだらけ</strong>になる。サブディビジョンとは相性が悪い
+          </li>
+          <li>
+            文字やロゴのような平面的な形は、無理にきれいなトポロジーにしようとせず、<strong>そのままブーリアンや押し出しで使う</strong>割り切りでよい
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
