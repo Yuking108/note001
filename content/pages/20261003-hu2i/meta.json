@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "20261003-hu2i",
+  "title": "複数オブジェクトに同じマテリアルを一括で割り当てる（Ctrl+L）",
+  "summary": "割り当て先を複数選択し、最後にコピー元を Shift+クリックしてアクティブにしてから Ctrl+L >「マテリアルをリンク」で一括割り当てできる。リンクはコピーではなく共有なので、1つだけ色を変えたいときはマテリアル名横の使用者数ボタンで単一化する。",
+  "mainLabel": "Blender/シーンとオブジェクト",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/レンダリング",
+    "Blender/ファイルとデータ"
+  ],
+  "createdAt": "2026-10-03",
+  "updatedAt": "2026-10-03",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_複数オブジェクトに同じマテリアルを割り当てる.md",
+    "note": "docs/テクニック/TIPS_複数オブジェクトに同じマテリアルを割り当てる.md を夜間取り込みでページ化したもの"
+  }
+}
