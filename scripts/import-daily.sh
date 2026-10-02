@@ -28,6 +28,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO" || exit 1
 
 BRANCH="${NOTE001_BRANCH:-main}"
+RETRY_DELAY="${NOTE001_RETRY_DELAY:-20}"
 MODEL="${NOTE001_MODEL:-opus}"
 MAX_USD="${NOTE001_MAX_USD:-4}"
 CLASSIFY_TIMEOUT="${NOTE001_CLASSIFY_TIMEOUT:-600}"
@@ -230,25 +231,35 @@ while IFS= read -r md_file; do
     failed=$((failed + 1)); continue
   fi
 
-  # 1. 分類（読むだけ）
+  # 1. 分類（読むだけ）。
+  # 2026-10-02、連続呼び出しで一時的に詰まったとみられる失敗が3件続けて起き、
+  # 数時間後に手で再実行したら全部1回で通った。一晩の中で1回だけ間を置いて
+  # 再試行すれば、同じ失敗を翌晩まで持ち越さずに済む
   prompt="$(render scripts/import/classify-prompt.md \
     MD_FILE "$md_file" FOLDER "${folder:-（フォルダ無し）}")"
-  if ! run_claude "$TMP_DIR/classify.json" "$CLASSIFY_TIMEOUT" \
-    -p "$prompt" \
-    --model "$MODEL" \
-    --max-budget-usd "$MAX_USD" \
-    --output-format json \
-    --json-schema "$(cat scripts/import/classify-schema.json)" \
-    --allowedTools "Read,Glob,Grep" \
-    --disallowedTools "Bash,Write,Edit"; then
-    log "失敗 $md_file: 分類が終わりませんでした（時間切れかエラー）"
+  classify_ok=0
+  for attempt in 1 2; do
+    if run_claude "$TMP_DIR/classify.json" "$CLASSIFY_TIMEOUT" \
+      -p "$prompt" \
+      --model "$MODEL" \
+      --max-budget-usd "$MAX_USD" \
+      --output-format json \
+      --json-schema "$(cat scripts/import/classify-schema.json)" \
+      --allowedTools "Read,Glob,Grep" \
+      --disallowedTools "Bash,Write,Edit" &&
+      jq -e '.is_error == false and (.structured_output | type) == "object"' \
+        "$TMP_DIR/classify.json" >/dev/null 2>&1; then
+      classify_ok=1
+      break
+    fi
     dump_claude_failure "$TMP_DIR/classify.json"
-    rollback; failed=$((failed + 1)); continue
-  fi
-  if ! jq -e '.is_error == false and (.structured_output | type) == "object"' \
-    "$TMP_DIR/classify.json" >/dev/null 2>&1; then
-    log "失敗 $md_file: 分類の結果を読めませんでした"
-    dump_claude_failure "$TMP_DIR/classify.json"
+    if [ "$attempt" -eq 1 ]; then
+      log "分類に失敗。${RETRY_DELAY}秒待って1回だけ再試行します: $md_file"
+      sleep "$RETRY_DELAY"
+    fi
+  done
+  if [ "$classify_ok" -ne 1 ]; then
+    log "失敗 $md_file: 分類が2回とも失敗しました"
     rollback; failed=$((failed + 1)); continue
   fi
 
@@ -301,25 +312,32 @@ while IFS= read -r md_file; do
     '.summary = $s | .source = {kind: "claude-code", file: $f, note: ("docs/" + $f + " を夜間取り込みでページ化したもの")}' \
     "$meta" >"$meta.tmp" && mv "$meta.tmp" "$meta"
 
-  # 4. 本文を書く
+  # 4. 本文を書く（分類と同じ理由で1回だけ再試行する）
   prompt="$(render scripts/import/write-prompt.md \
     MD_FILE "$md_file" SLUG "$slug" REFERENCE_SLUG "$reference_slug" TITLE "$title" \
     NOTE_KIND "$note_kind")"
-  if ! run_claude "$TMP_DIR/write.json" "$WRITE_TIMEOUT" \
-    -p "$prompt" \
-    --model "$MODEL" \
-    --max-budget-usd "$MAX_USD" \
-    --output-format json \
-    --permission-mode acceptEdits \
-    --allowedTools "Read,Write,Edit,Glob,Grep" \
-    --disallowedTools "Bash"; then
-    log "失敗 $md_file: 本文の執筆が終わりませんでした（時間切れかエラー）"
+  write_ok=0
+  for attempt in 1 2; do
+    if run_claude "$TMP_DIR/write.json" "$WRITE_TIMEOUT" \
+      -p "$prompt" \
+      --model "$MODEL" \
+      --max-budget-usd "$MAX_USD" \
+      --output-format json \
+      --permission-mode acceptEdits \
+      --allowedTools "Read,Write,Edit,Glob,Grep" \
+      --disallowedTools "Bash" &&
+      jq -e '.is_error == false' "$TMP_DIR/write.json" >/dev/null 2>&1; then
+      write_ok=1
+      break
+    fi
     dump_claude_failure "$TMP_DIR/write.json"
-    rollback; failed=$((failed + 1)); continue
-  fi
-  if ! jq -e '.is_error == false' "$TMP_DIR/write.json" >/dev/null 2>&1; then
-    log "失敗 $md_file: 執筆がエラーで終わりました"
-    dump_claude_failure "$TMP_DIR/write.json"
+    if [ "$attempt" -eq 1 ]; then
+      log "執筆に失敗。${RETRY_DELAY}秒待って1回だけ再試行します: $md_file"
+      sleep "$RETRY_DELAY"
+    fi
+  done
+  if [ "$write_ok" -ne 1 ]; then
+    log "失敗 $md_file: 執筆が2回とも失敗しました"
     rollback; failed=$((failed + 1)); continue
   fi
 
@@ -388,5 +406,9 @@ if ! push_out="$(git push origin "$BRANCH" 2>&1)"; then
 fi
 
 log "push しました"
-notify "取り込み完了" "作成 ${created} / 見送り ${skipped} / 失敗 ${failed}"
+if [ "$failed" -gt 0 ]; then
+  notify "取り込み完了（一部失敗）" "作成 ${created} / 見送り ${skipped} / 失敗 ${failed}。ログを確認してください"
+else
+  notify "取り込み完了" "作成 ${created} / 見送り ${skipped} / 失敗 ${failed}"
+fi
 log "=== 夜間取り込み 終了 ==="
