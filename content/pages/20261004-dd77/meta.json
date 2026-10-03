@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20261004-dd77",
+  "title": "ライトのパワーが昔のチュートリアルの数値と合わない",
+  "summary": "W の意味は変わっておらず、見た目が違う原因は6つ（ライトUIの露出・正規化、ビュー変換のFilmic→AgX、EEVEE Next、エリアライトのサイズ、シーンスケールの逆二乗、カラーマネジメントの露出）。実際に白飛びしたケースの原因はシーンスケールで、まずは実寸かどうかを疑うのが最短。",
+  "mainLabel": "Blender/レンダリング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/シーンとオブジェクト"
+  ],
+  "createdAt": "2026-10-04",
+  "updatedAt": "2026-10-04",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A/Q&A_ライトのパワーが昔の数値と合わない.md",
+    "note": "docs/Q&A/Q&A_ライトのパワーが昔の数値と合わない.md を夜間取り込みでページ化したもの"
+  }
+}
