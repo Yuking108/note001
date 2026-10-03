@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>シェーディングの種類と自動スムーズシェード</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・SVG 図の色だけ
+         足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        /* 図の中でメッシュの面と法線を描き分ける色 */
+        --ob-line: #6b645d;
+        --ob-fill: #efece9;
+        --normal: #4a7c9b;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --ob-line: #8e8a97;
+          --ob-fill: #2a282f;
+          --normal: #7eb3cf;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 3列以上で、どの列にも文章が入る表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 番号は position: absolute で置く。li を grid / flex にすると、
+         中に strong や code を挟んだ瞬間に1文字ずつ縦に並ぶ */
+      ol.steps {
+        max-width: var(--measure);
+        list-style: none;
+        counter-reset: step;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--accent);
+        border-bottom: 1px solid var(--accent-line);
+        padding-bottom: 0.1rem;
+        text-align: center;
+        position: absolute;
+        left: 0;
+        width: 1.7rem;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 「→ こうする」の対処行。矢印は absolute で置く */
+      p.fix {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-bottom: 1.1rem;
+      }
+      p.fix::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        width: 1.2rem;
+        text-align: left;
+        color: var(--accent);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+      .note.warn {
+        background: var(--accent-bg);
+        border-color: var(--accent-line);
+      }
+
+      /* 場所を示す行。「ここを見る」のパンくず */
+      p.where {
+        max-width: var(--measure);
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+        margin: 0 0 1.1rem;
+      }
+
+      figure.diagram {
+        max-width: 34rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>シェーディングの種類と自動スムーズシェード</h1>
+        <p class="standfirst">
+          フラット / スムーズ / 自動スムーズの<strong>どれを選ぶか</strong>。ついでに、自動スムーズシェードがモディファイアとして現れる理由と、<strong>それを消しただけではフラットに戻らない</strong>という落とし穴。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >迷ったら<strong>自動スムーズシェード</strong>。3つとも可逆なので、「戻せるかどうか」は判断基準にならない。</span
+        >
+        <p>
+          本当の基準は「<strong>どの角を滑らかにしたいか</strong>」。全面が曲面なら<strong>スムーズシェード</strong>、角のある形なら<strong>自動スムーズシェード</strong>、意図してカクカクさせたいなら<strong>フラットシェード</strong>。
+        </p>
+        <p>
+          自動スムーズシェードは<strong>角度しきい値で結果を調整できる</strong>ので融通が効く。選びに迷う時間のほうが高い。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Options</span>3つのシェーディング</h2>
+        <p>オブジェクトモードで<strong>右クリック</strong>すると出てくる。</p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">種類</th>
+                <th scope="col">内容</th>
+                <th scope="col">向いているもの</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">フラットシェード</th>
+                <td>すべての面をカクカクに。<strong>デフォルト</strong></td>
+                <td>低ポリ、メカ、本当に平面で構成された物</td>
+              </tr>
+              <tr>
+                <th scope="row">スムーズシェード</th>
+                <td><strong>すべての面</strong>を滑らかに</td>
+                <td>球、円柱の側面など、全面が曲面のもの</td>
+              </tr>
+              <tr>
+                <th scope="row">自動スムーズシェード</th>
+                <td><strong>角度で自動的に使い分ける</strong></td>
+                <td><strong>実物のほとんど。箱・製品・ベベル済みの形</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>作るものから引く</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">作りたいもの</th>
+                <th scope="col">選ぶもの</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">球、玉、完全な曲面</th>
+                <td>スムーズシェード</td>
+              </tr>
+              <tr>
+                <th scope="row">角のある製品・箱・ベベルを入れた形</th>
+                <td><strong>自動スムーズシェード</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">低ポリ、意図的にカクカクさせたい</th>
+                <td>フラットシェード</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>判断の根拠：角度のしきい値</h2>
+        <p>
+          自動スムーズシェードの中身は、<strong>しきい値の角度（デフォルト 30°）より緩やかな角は滑らかに、鋭い角はシャープのまま</strong>にする、というだけ。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 400 170"
+            role="img"
+            aria-label="隣り合う2つの面が作る角度を、しきい値より緩やかな場合と鋭い場合で並べた模式図。左は角度が緩やかなため法線が補間されて滑らかに繋がる。右は角度が鋭いためエッジが立ったまま残る。"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10">
+              <!-- 左：しきい値より緩やか = 滑らかに繋ぐ -->
+              <path
+                d="M 24 92 L 95 104 L 166 92 L 166 128 L 24 128 Z"
+                fill="var(--ob-fill)"
+                stroke="var(--ob-line)"
+                stroke-width="1.5"
+              />
+              <path d="M 60 98 L 56 70" stroke="var(--normal)" stroke-width="1.5" stroke-dasharray="3 3" />
+              <path d="M 130 98 L 134 70" stroke="var(--normal)" stroke-width="1.5" stroke-dasharray="3 3" />
+              <text x="24" y="42" fill="var(--fg-muted)">角度 &lt; しきい値</text>
+              <text x="24" y="58" fill="var(--accent)">法線を補間 → 滑らか</text>
+              <text x="24" y="150" fill="var(--fg-muted)">円柱の側面どうし</text>
+
+              <!-- 右：しきい値より鋭い = エッジが立つ -->
+              <path
+                d="M 240 60 L 310 60 L 310 128 L 240 128 Z"
+                fill="var(--ob-fill)"
+                stroke="var(--ob-line)"
+                stroke-width="1.5"
+              />
+              <path d="M 275 54 L 275 28" stroke="var(--normal)" stroke-width="1.5" stroke-dasharray="3 3" />
+              <path d="M 316 94 L 342 94" stroke="var(--normal)" stroke-width="1.5" stroke-dasharray="3 3" />
+              <text x="240" y="150" fill="var(--fg-muted)">円柱の天面と側面</text>
+              <text x="240" y="42" fill="var(--accent)">エッジが立つ</text>
+              <text x="240" y="20" fill="var(--fg-muted)">角度 &gt; しきい値</text>
+
+              <!-- 中央の区切り -->
+              <path d="M 203 14 L 203 156" stroke="var(--border)" stroke-width="1" />
+            </g>
+          </svg>
+          <figcaption>
+            点線は法線（光の当たり方の基準）。隣の面との角度がしきい値より小さいときだけ繋いで補間する。
+          </figcaption>
+        </figure>
+
+        <p>
+          円柱なら、<strong>側面はなめらかに繋がり、天面との境目はエッジが立つ</strong>。これが自然な見え方になる。
+        </p>
+        <div class="note">
+          <p>
+            <strong>「とりあえず全部スムーズにしたら角まで溶けて変になった」の解決策がこれ。</strong>
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Reversible</span>大前提：3つとも元に戻せる</h2>
+        <p>
+          <strong>スムーズシェードは完全に可逆。形状は一切変わらない。</strong> やっているのは<strong>面の陰影をどう計算するかの切り替えだけ</strong>で、頂点も面も1つも動かない。
+        </p>
+        <p>
+          見た目が丸く見えるのは、法線を隣の面と繋がっているように補間しているから。<strong>実際の形はカクカクのまま。</strong>
+        </p>
+        <p class="where">
+          戻し方：オブジェクトモードで<strong>右クリック &gt; フラットシェード（Shade Flat）</strong>。これで一発。
+        </p>
+        <div class="note">
+          <p>
+            <strong>誤解の元は「適用」という言葉。</strong> 破壊的な操作に思えるが、<strong>スムーズシェードに「適用」は存在しない</strong>。単なる状態の切り替えで、ベベルやブーリアンのような「適用したら戻せない」操作とはまったく別物。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">4.1</span>自動スムーズシェードがモディファイアとして出る理由</h2>
+        <p><strong>Blender 4.1 で仕様が変わった。</strong></p>
+        <ul class="ticks">
+          <li>
+            <strong>4.0 まで</strong> … メッシュのプロパティに「自動スムーズ」というチェックボックスと角度設定があった
+          </li>
+          <li>
+            <strong>4.1 以降</strong> … そのチェックボックスは廃止され、<strong>「スムーズ・バイ・アングル（Smooth by Angle）」というジオメトリノードのモディファイア</strong>として実装された
+          </li>
+        </ul>
+        <p>だからモディファイアスタックに現れる。仕組みが変わっただけで、得られる結果は同じ系統。</p>
+
+        <h3>モディファイアになったことの利点</h3>
+        <ul class="ticks">
+          <li><strong>角度をいつでも変えられる</strong>（モディファイアの値を触るだけ）</li>
+          <li><strong>削除すれば効果が消える</strong>（非破壊）</li>
+          <li>他のモディファイアとの<strong>順番を変えられる</strong></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Caveat</span>モディファイアを削除しても「フラット」には戻らない</h2>
+        <p><strong>「自動スムーズシェード」は2つのことを同時にやっている。</strong></p>
+        <pre><code>自動スムーズシェード =
+  ① メッシュ全体をスムーズシェードにする
+  ＋
+  ② 「スムーズ・バイ・アングル」モディファイアを追加する</code></pre>
+        <p>
+          そのため、<strong>モディファイアだけを削除すると「全部スムーズ」の状態が残る。</strong> 角が溶けたままになるのはこれが原因。
+        </p>
+        <p class="fix">
+          完全にフラットへ戻すには、モディファイアを消したうえで<strong>右クリック &gt; フラットシェード</strong>も実行する。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Alternative</span>保留した選択肢：シャープをマーク</h2>
+        <p>
+          <strong>角を手動で指定したい</strong>場合に使う。角度では拾いきれない「ここだけは角を立てたい」という場所を、1本ずつ指定できる。
+        </p>
+        <ol class="steps">
+          <li>スムーズシェードを適用</li>
+          <li>編集モードで、立たせたい辺を選択</li>
+          <li><strong>辺 &gt; シャープをマーク</strong></li>
+        </ol>
+        <p>
+          自動スムーズシェードと<strong>併用もできる</strong>。まず自動スムーズで大枠を任せ、足りない辺だけ手でマークするのが素直。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
