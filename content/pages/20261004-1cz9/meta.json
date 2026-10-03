@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20261004-1cz9",
+  "title": "スペキュラーとIOR（プリンシプルBSDF）",
+  "summary": "スペキュラーは誘電体が正面から受けた光をどれだけ跳ね返すかの値で、デフォルト 0.5（＝正面反射率4%、IOR 約1.5）が現実の大半をカバーするため基本はいじらない。4.0 以降は IOR が主役になり、「テカりを抑えたい」場合もスペキュラーではなく粗さで調整するのが正解。",
+  "mainLabel": "Blender/レンダリング",
+  "subLabels": [
+    "Blender/知識"
+  ],
+  "createdAt": "2026-10-04",
+  "updatedAt": "2026-10-04",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "知識/KNOW_スペキュラーとIOR.md",
+    "note": "docs/知識/KNOW_スペキュラーとIOR.md を夜間取り込みでページ化したもの"
+  }
+}

@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>スペキュラーとIOR（プリンシプルBSDF）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・SVG 図の色だけ
+         足す。足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --surface: #ffffff;
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        /* 図の中で表面と視線・反射を描き分ける色 */
+        --ob-line: #6b645d;
+        --ob-fill: #efece9;
+        --ray: #4a7c9b;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --surface: #1e1d22;
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --ob-line: #8e8a97;
+          --ob-fill: #2a282f;
+          --ray: #7eb3cf;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 3列以上で、どの列にも文章が入る表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      /* 数値が並ぶだけの細い表 */
+      table.narrow {
+        min-width: 20rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 「→ こうする」の対処行。矢印は absolute で置く */
+      p.fix {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-bottom: 1.1rem;
+      }
+      p.fix::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        width: 1.2rem;
+        text-align: left;
+        color: var(--accent);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+      .note.warn {
+        background: var(--accent-bg);
+        border-color: var(--accent-line);
+      }
+
+      figure.diagram {
+        max-width: 34rem;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>スペキュラーとIOR（プリンシプルBSDF）</h1>
+        <p class="standfirst">
+          金属以外の素材の反射の強さを、<strong>どのスライダーで決めるか</strong>。4.0 で名前が変わって<strong>IOR が主役になった</strong>件と、「テカりすぎる」をスペキュラーで直そうとすると素材が壊れる理由。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >結論：<strong>デフォルト（IOR 1.5 / スペキュラー 0.5）のまま触らない。</strong>反射の調整は<strong>粗さとベースカラー</strong>でやる。</span
+        >
+        <p>
+          デフォルトの 0.5 は<strong>正面での反射率 4%</strong>にあたり、<strong>現実の誘電体（プラスチック、木、布、肌、ガラス）はほぼすべてこの値</strong>。つまり大半の素材がデフォルトでカバーできている。
+        </p>
+        <p>
+          <strong>4.x でどうしても反射の強さを変えたいなら、触るのは IOR。</strong>「スペキュラー IOR レベル」は物理を無視してでも反射を弱めたい／強めたいときの逃げ道で、通常は 0.5 のまま。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Options</span>4.0 以降の 3 項目：どれを触るか</h2>
+        <p>4.0 でプリンシプルBSDFが整理され、名前と役割が変わった。</p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">内容</th>
+                <th scope="col">触るか</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">IOR（屈折率）</th>
+                <td>
+                  デフォルト <code>1.5</code>。<strong>反射の強さと、透過時の屈折の両方</strong>を決める
+                </td>
+                <td><strong>こちらが主役。変えるならここ</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">スペキュラー IOR レベル</th>
+                <td>
+                  旧「スペキュラー」。デフォルト <code>0.5</code> = <strong>IOR の計算どおり</strong>。動かすと IOR と矛盾した非物理的な値になる
+                </td>
+                <td>原則そのまま。意図的な逃げ道としてだけ</td>
+              </tr>
+              <tr>
+                <th scope="row">スペキュラーチント</th>
+                <td>正面の反射に色を付ける</td>
+                <td>必要なときだけ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Numbers</span>スペキュラー値と反射率の対応</h2>
+        <p>スペキュラーは「正面から見たときに、その表面がどれだけ光を跳ね返すか」の値。中身はこれだけ。</p>
+        <pre><code>正面から見たときの反射率 = スペキュラー値 × 0.08</code></pre>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">スペキュラー</th>
+                <th scope="col">正面の反射率</th>
+                <th scope="col">相当するIOR</th>
+                <th scope="col">実際の素材</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">0</th>
+                <td>0%</td>
+                <td>—</td>
+                <td>反射しない（非現実的）</td>
+              </tr>
+              <tr>
+                <th scope="row">0.5（デフォルト）</th>
+                <td><strong>4%</strong></td>
+                <td><strong>約1.5</strong></td>
+                <td><strong>ガラス、プラスチック、ほとんどの素材</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">1.0</th>
+                <td>8%</td>
+                <td>約1.8</td>
+                <td>現実にはあまりない高さ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>素材別の IOR の目安</h3>
+        <div class="scroll-x">
+          <table class="narrow">
+            <thead>
+              <tr>
+                <th scope="col">素材</th>
+                <th scope="col">IOR</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">空気</th>
+                <td>1.0</td>
+              </tr>
+              <tr>
+                <th scope="row">氷</th>
+                <td>1.31</td>
+              </tr>
+              <tr>
+                <th scope="row">水</th>
+                <td>1.33</td>
+              </tr>
+              <tr>
+                <th scope="row">プラスチック全般</th>
+                <td>1.45〜1.55</td>
+              </tr>
+              <tr>
+                <th scope="row">ガラス</th>
+                <td>1.5</td>
+              </tr>
+              <tr>
+                <th scope="row">サファイア</th>
+                <td>1.77</td>
+              </tr>
+              <tr>
+                <th scope="row">ダイヤモンド</th>
+                <td>2.42</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>判断の根拠：「鏡のような反射」は角度が作っている</h2>
+        <p>
+          ガラスも木も肌も、<strong>真正面から見たときの反射率は意外と似ていて約 4%</strong>。鏡のように強く反射して見えるのは、正面ではなく<strong>浅い角度から見たとき</strong>。
+        </p>
+
+        <figure class="diagram">
+          <svg
+            viewBox="0 0 400 180"
+            role="img"
+            aria-label="同じ表面を正面から見た場合と浅い角度から見た場合を並べた模式図。正面からは反射率が約4%にとどまり、視線が浅くなるほど反射が強くなる。"
+          >
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10">
+              <!-- 左：正面から見る = 4% -->
+              <path
+                d="M 24 120 L 166 120 L 166 136 L 24 136 Z"
+                fill="var(--ob-fill)"
+                stroke="var(--ob-line)"
+                stroke-width="1.5"
+              />
+              <path d="M 95 54 L 95 114" stroke="var(--ray)" stroke-width="1.5" />
+              <path d="M 89 106 L 95 114 L 101 106" fill="none" stroke="var(--ray)" stroke-width="1.5" />
+              <text x="24" y="30" fill="var(--fg-muted)">正面から見る</text>
+              <text x="24" y="46" fill="var(--accent)">反射は約 4% だけ</text>
+              <text x="24" y="158" fill="var(--fg-muted)">= デフォルト 0.5 / IOR 1.5</text>
+
+              <!-- 右：浅い角度から見る = 強く反射 -->
+              <path
+                d="M 240 120 L 382 120 L 382 136 L 240 136 Z"
+                fill="var(--ob-fill)"
+                stroke="var(--ob-line)"
+                stroke-width="1.5"
+              />
+              <path d="M 246 70 L 311 114" stroke="var(--ray)" stroke-width="1.5" />
+              <path d="M 301 108 L 311 114 L 306 104" fill="none" stroke="var(--ray)" stroke-width="1.5" />
+              <path d="M 311 114 L 376 70" stroke="var(--ray)" stroke-width="2.5" />
+              <text x="240" y="30" fill="var(--fg-muted)">浅い角度から見る</text>
+              <text x="240" y="46" fill="var(--accent)">反射が強くなる（フレネル）</text>
+              <text x="240" y="158" fill="var(--fg-muted)">= 自動で計算される</text>
+
+              <!-- 中央の区切り -->
+              <path d="M 203 16 L 203 166" stroke="var(--border)" stroke-width="1" />
+            </g>
+          </svg>
+          <figcaption>
+            どんな素材でも視線が浅くなるほど反射が強くなる（フレネル効果）。この挙動は自動で計算されるので、スペキュラーで操作するものではない。
+          </figcaption>
+        </figure>
+
+        <h3>金属ではそもそも無視される</h3>
+        <p>
+          <strong>メタリックを 1.0 にすると、スペキュラーの値は（ほぼ）効かなくなる。</strong>金属の反射は<strong>ベースカラー</strong>が決める。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">メタリック</th>
+                <th scope="col">反射の色を決めるもの</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">0（非金属）</th>
+                <td>白（無彩色）の反射。強さは IOR / スペキュラー</td>
+              </tr>
+              <tr>
+                <th scope="row">1（金属）</th>
+                <td><strong>ベースカラー</strong>の色で反射する</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fix">
+          金色の金属を作るなら<strong>ベースカラーを金色にする</strong>。金属にスペキュラーをいじっても意味がない。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Mixup</span>「粗さ」とは別物</h2>
+        <p>ハイライトまわりで混同されやすい2つ。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">何を変えるか</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">スペキュラー / IOR</th>
+                <td>反射の<strong>強さ</strong>（どれだけ跳ね返すか）</td>
+              </tr>
+              <tr>
+                <th scope="row">粗さ（Roughness）</th>
+                <td>反射の<strong>ぼやけ具合</strong>（鏡かマットか）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="ticks">
+          <li>ハイライトが<strong>白く小さく鋭い</strong> → 粗さが低い</li>
+          <li>ハイライトが<strong>広くぼんやり</strong> → 粗さが高い</li>
+        </ul>
+        <div class="note warn">
+          <p>
+            <strong>「テカりすぎるから抑えたい」のほとんどは、スペキュラーではなく粗さを上げるのが正解。</strong>
+          </p>
+          <p>
+            スペキュラーを下げると、素材そのものが非現実的になる（光を跳ね返さない物体になる）。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Alternative</span>保留した選択肢：それでも動かす場面</h2>
+        <p>スペキュラー（IORレベル）をデフォルトから動かす場面は少ないが、以下は実用的。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">場面</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">布・起毛素材・つや消しの紙</th>
+                <td>わずかに下げる（<code>0.3</code>〜<code>0.4</code>）</td>
+              </tr>
+              <tr>
+                <th scope="row">濡れた表面・ニス塗り</th>
+                <td>IOR を上げる、または少し上げる</td>
+              </tr>
+              <tr>
+                <th scope="row">完全にマットな板（撮影用の黒ケント紙など）</th>
+                <td>下げる＋粗さを上げる</td>
+              </tr>
+              <tr>
+                <th scope="row">アニメ調で反射を消したい</th>
+                <td><code>0</code> にする（非物理的だが意図的）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>迷ったらデフォルトの 0.5（IOR 1.5）のままにして、粗さとベースカラーで調整する。</strong>これが最も現実に近く、破綻しない。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
