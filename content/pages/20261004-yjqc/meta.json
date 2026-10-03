@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20261004-yjqc",
+  "title": "水のマテリアル（グラスBSDF）",
+  "summary": "水はグラスBSDF＋複合散乱GGX、粗さ0.2・IOR 1.33 で作る（1.33 は水の実際の屈折率でソフト共通、0.2 はさざ波のミクロな凹凸分）。屈折は Cycles 前提で、色付けはカラーではなくボリュームの吸収、メッシュは厚みのある閉じた立体にする。",
+  "mainLabel": "Blender/レンダリング",
+  "subLabels": [
+    "Blender/テクニック"
+  ],
+  "createdAt": "2026-10-04",
+  "updatedAt": "2026-10-04",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_水のマテリアル（グラスBSDF）.md",
+    "note": "docs/テクニック/TIPS_水のマテリアル（グラスBSDF）.md を夜間取り込みでページ化したもの"
+  }
+}
