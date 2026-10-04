@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>オブジェクトの原点（オレンジの点）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 4列以上の表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      tr.hit td,
+      tr.hit th {
+        background: var(--accent-bg);
+      }
+      figure {
+        margin: 1.6rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 公式マニュアルの定義。縦罫は border-left で引く */
+      blockquote.quote {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.2rem 0 0.2rem 1.1rem;
+        border-left: 3px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.95rem;
+      }
+      blockquote.quote p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.quote p + p {
+        margin-top: 0.4rem;
+        font-size: 0.85rem;
+      }
+
+      /* 定義リスト。dt / dd は通常フローのまま（grid にしない） */
+      dl.defs {
+        max-width: var(--measure);
+        margin: 1.3rem 0;
+      }
+      dl.defs dt {
+        font-weight: 700;
+        margin-top: 1rem;
+      }
+      dl.defs dt:first-child {
+        margin-top: 0;
+      }
+      dl.defs dd {
+        margin: 0.15rem 0 0;
+        color: var(--fg-muted);
+        font-size: 0.95rem;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 「→ こうする」の対処行。矢印は absolute で置く */
+      p.fix {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-bottom: 1.1rem;
+      }
+      p.fix::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        width: 1.2rem;
+        text-align: left;
+        color: var(--accent);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+      .note.warn {
+        background: var(--accent-bg);
+        border-color: var(--accent-line);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>オブジェクトの原点（オレンジの点）</h1>
+        <p class="standfirst">
+          オブジェクトを選択したときに出る小さなオレンジの円。<strong>重心ではない。</strong>
+          「オブジェクトが3D空間のどこにあるか」を決めている点で、回転・スケール・親子付け・モディファイアの基準も全部これ。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big">結論：あれは<strong>原点（Object Origin）</strong>。重心（Center of Mass）とは別物。</span>
+        <p>
+          初期状態の原点は、単に<strong>オブジェクトを作ったときに3Dカーソルがあった場所</strong>でしかない。
+        </p>
+        <p>
+          重心ではない証拠：Blender には <strong>オブジェクト &gt; 原点を設定 &gt; 「原点を重心に移動」</strong>
+          という専用メニューが<strong>別に用意されている</strong>。わざわざ「重心へ移動させる」操作があるということは、普段の原点は重心ではない。
+        </p>
+      </div>
+
+      <blockquote class="quote">
+        <p>各オブジェクトには原点がある。この点の位置が、オブジェクトが3D空間のどこにあるかを決める。</p>
+        <p>
+          Each object has an origin point. The location of this point determines where the object is
+          located in 3D space.（公式マニュアルの定義）
+        </p>
+      </blockquote>
+
+      <section>
+        <h2><span class="lead">Roles</span>原点が決めているもの</h2>
+        <p>原点はただの飾りではなく、<strong>5つのことの基準</strong>になっている。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">役割</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">オブジェクトの位置</th>
+                <td><code>N</code> パネルの「位置 XYZ」は、<strong>原点の座標</strong>を表示している</td>
+              </tr>
+              <tr>
+                <th scope="row">回転の中心</th>
+                <td><code>R</code> で回したときに中心になる点</td>
+              </tr>
+              <tr>
+                <th scope="row">スケールの中心</th>
+                <td><code>S</code> で拡大縮小したときの基準点</td>
+              </tr>
+              <tr>
+                <th scope="row">親子付けの基準</th>
+                <td>子オブジェクトは親の原点を基準に動く</td>
+              </tr>
+              <tr>
+                <th scope="row">モディファイアの基準</th>
+                <td>ミラーの対称面、アレイのオフセットは原点が基準</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          だから原点の位置は「どこでもいい」わけではなく、<strong>そのオブジェクトをどう動かしたいかで決まる。</strong>
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">原点の置き場所</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ドアを開閉させたい</th>
+                <td><strong>蝶番の位置</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">床に置く家具</th>
+                <td><strong>底面の中心</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">その場で回転させたい</th>
+                <td><strong>ジオメトリの中心</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Move</span>原点を動かす2つの考え方</h2>
+        <p>
+          「原点とメッシュの相対位置を変える」には<strong>2通りのやり方</strong>があり、<strong>結果が違う。</strong>
+          ここが混乱しやすいポイント。
+        </p>
+
+        <h3>A. 原点だけを動かす（メッシュはその場）</h3>
+        <p>
+          <strong>オブジェクトモード</strong>で <strong>オブジェクト &gt; 原点を設定 &gt; …</strong>。
+          メッシュはワールド座標上で1ミリも動かず、原点だけが移動する。
+        </p>
+
+        <h3>B. メッシュだけを動かす（原点はその場）</h3>
+        <p>
+          <strong>編集モード</strong>に入って <code>A</code> で全選択 → <code>G</code> で移動。
+          原点は置き去りで、メッシュだけが動く。
+        </p>
+
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やり方</th>
+                <th scope="col">動くもの</th>
+                <th scope="col">ワールド座標でのメッシュの位置</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="hit">
+                <th scope="row">A. 原点を設定（オブジェクトモード）</th>
+                <td>原点</td>
+                <td><strong>変わらない</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">B. <code>A</code> → <code>G</code>（編集モード）</th>
+                <td>メッシュ</td>
+                <td><strong>変わる</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">参考: <code>A</code> → <code>G</code>（オブジェクトモード）</th>
+                <td>原点とメッシュの両方</td>
+                <td>変わる（相対位置は不変）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fix">
+          <strong>形を今の場所に置いたまま原点だけ直したいなら A。</strong>
+          B は形ごと移動してしまうので、位置が決まっているシーンでは使えない。
+        </p>
+        <div class="note warn">
+          <p>
+            <strong>オブジェクトモードで <code>A</code> → <code>G</code> をすると、原点も一緒に動く</strong>（オブジェクト全体が移動するだけで、相対位置は変わらない）。
+          </p>
+          <p>原点が動かずメッシュだけ動いたなら、それは編集モードに入っていたということ。</p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Menu</span>「原点を設定」メニューの全項目</h2>
+        <p>オブジェクトモードで <strong>オブジェクト &gt; 原点を設定</strong>。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">動くもの</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ジオメトリを原点へ移動</th>
+                <td><strong>メッシュ</strong></td>
+                <td>原点の位置へメッシュが飛んでくる</td>
+              </tr>
+              <tr>
+                <th scope="row">原点をジオメトリへ移動</th>
+                <td><strong>原点</strong></td>
+                <td>原点がメッシュの中心へ寄る</td>
+              </tr>
+              <tr>
+                <th scope="row">原点を3Dカーソルへ移動</th>
+                <td>原点</td>
+                <td>原点が3Dカーソルの位置へ</td>
+              </tr>
+              <tr>
+                <th scope="row">原点を重心に移動（サーフェス）</th>
+                <td>原点</td>
+                <td>表面積の分布から求めた重心へ</td>
+              </tr>
+              <tr>
+                <th scope="row">原点を重心に移動（ボリューム）</th>
+                <td>原点</td>
+                <td>密度が均一と仮定した体積の重心へ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fix">
+          名前が似ている上2つは<strong>動くものが逆</strong>なので、ここが最大の注意点。
+        </p>
+
+        <h3>「中心」オプション（原点をジオメトリへ移動 の下位設定）</h3>
+        <p>実行後の左下パネル（<code>F9</code>）で切り替えられる。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">中心の種類</th>
+                <th scope="col">計算方法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">中点（Median Point）</th>
+                <td>全頂点の平均位置。<strong>頂点が密集している側に引っ張られる</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">バウンディングボックス</th>
+                <td>外接する箱の中心。頂点の密度に影響されない</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure>
+          <svg viewBox="0 0 360 170" role="img" aria-label="左端に頂点が密集した細長い形。中点は密集側に寄り、バウンディングボックスの中心は形の真ん中に来る">
+            <!-- バウンディングボックス -->
+            <rect
+              x="20"
+              y="45"
+              width="320"
+              height="60"
+              fill="none"
+              stroke="currentColor"
+              stroke-opacity="0.3"
+              stroke-width="1"
+              stroke-dasharray="4 4"
+            />
+            <!-- 形そのもの -->
+            <polygon
+              points="20,75 35,45 50,55 340,75 50,95 35,105"
+              fill="currentColor"
+              fill-opacity="0.07"
+              stroke="currentColor"
+              stroke-opacity="0.45"
+              stroke-width="1.5"
+            />
+            <!-- 頂点 -->
+            <g fill="currentColor" fill-opacity="0.65">
+              <circle cx="20" cy="75" r="3" />
+              <circle cx="35" cy="45" r="3" />
+              <circle cx="35" cy="105" r="3" />
+              <circle cx="50" cy="55" r="3" />
+              <circle cx="50" cy="95" r="3" />
+              <circle cx="65" cy="75" r="3" />
+              <circle cx="340" cy="75" r="3" />
+            </g>
+            <!-- 中点（頂点の平均） -->
+            <circle cx="85" cy="75" r="5.5" fill="var(--accent)" />
+            <text x="85" y="134" fill="var(--accent-ink)" font-size="11" text-anchor="middle">中点</text>
+            <text x="85" y="148" fill="currentColor" fill-opacity="0.55" font-size="10" text-anchor="middle">頂点の平均</text>
+            <!-- バウンディングボックスの中心 -->
+            <g stroke="currentColor" stroke-opacity="0.75" stroke-width="1.6">
+              <line x1="173" y1="75" x2="187" y2="75" />
+              <line x1="180" y1="68" x2="180" y2="82" />
+            </g>
+            <text x="180" y="134" fill="currentColor" fill-opacity="0.8" font-size="11" text-anchor="middle">バウンディングボックスの中心</text>
+          </svg>
+          <figcaption>
+            左端に頂点が集まった細長い形では、中点とバウンディングボックスの中心が大きくずれる。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Terms</span>「中心」「重心」「原点」は全部別物</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">用語</th>
+                <th scope="col">意味</th>
+                <th scope="col">求め方</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="hit">
+                <th scope="row">原点（Origin）</th>
+                <td>
+                  Blender がオブジェクトの位置として扱う基準点。<strong>任意に置ける</strong>
+                </td>
+                <td>手動 / メニュー</td>
+              </tr>
+              <tr>
+                <th scope="row">ジオメトリの中心</th>
+                <td>頂点の平均、または外接箱の中心</td>
+                <td>原点をジオメトリへ移動</td>
+              </tr>
+              <tr>
+                <th scope="row">重心（Center of Mass）</th>
+                <td>質量の中心。物理的な量</td>
+                <td>原点を重心に移動</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>細長い三角形</strong>を想像すると分かりやすい。バウンディングボックスの中心、頂点の平均、重心は、どれも違う場所になる。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Check</span>見つける・確かめる</h2>
+
+        <h3>原点が見えないとき</h3>
+        <p>
+          ビューポート右上の<strong>オーバーレイ</strong>（2つの円が重なったアイコン）の <code>v</code> を開く。
+        </p>
+        <dl class="defs">
+          <dt>原点</dt>
+          <dd>選択中のオブジェクトの原点を表示</dd>
+          <dt>原点（すべて）</dt>
+          <dd>すべてのオブジェクトの原点を表示</dd>
+        </dl>
+
+        <h3>確認方法</h3>
+        <p><code>N</code> パネルの<strong>「位置」</strong>が原点のワールド座標。</p>
+        <ul class="ticks">
+          <li>原点を動かすと、この数値が<strong>変わる</strong></li>
+          <li>メッシュだけを動かしても、この数値は<strong>変わらない</strong></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

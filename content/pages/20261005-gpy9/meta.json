@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20261005-gpy9",
+  "title": "オブジェクトの原点（オレンジの点）",
+  "summary": "選択時に出るオレンジの点は重心ではなく「原点（Object Origin）」で、位置・回転・スケール・親子付け・モディファイアの5つの基準になっている。形を動かさず原点だけ直すならオブジェクトモードの「原点を設定」、原点を残してメッシュだけ動かすなら編集モードで A → G。",
+  "mainLabel": "Blender/シーンとオブジェクト",
+  "subLabels": [
+    "Blender/知識",
+    "Blender/モデリング"
+  ],
+  "createdAt": "2026-10-05",
+  "updatedAt": "2026-10-05",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "知識/KNOW_オブジェクトの原点（オレンジの点）.md",
+    "note": "docs/知識/KNOW_オブジェクトの原点（オレンジの点）.md を夜間取り込みでページ化したもの"
+  }
+}
