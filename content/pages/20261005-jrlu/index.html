@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>オブジェクトを選択できないようにロックする（選択を無効化）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 4列以上の表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      tr.hit td,
+      tr.hit th {
+        background: var(--accent-bg);
+      }
+      .no {
+        color: var(--accent-ink);
+        font-weight: 700;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 「→ こうする」の対処行。矢印は absolute で置く */
+      p.fix {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-bottom: 1.1rem;
+      }
+      p.fix::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        width: 1.2rem;
+        text-align: left;
+        color: var(--accent);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+      .note.warn {
+        background: var(--accent-bg);
+        border-color: var(--accent-line);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>オブジェクトを選択できないようにロックする（選択を無効化）</h1>
+        <p class="standfirst">
+          床やライトを<strong>見えたまま、クリックしても掴めない</strong>状態にする。Photoshop のレイヤーロックに相当するのは「選択を無効化」で、アイコンは<strong>デフォルトでは出ていない</strong>ので最初にフィルターから出す。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >結論：アウトライナーの<strong>「選択を無効化」（矢印アイコン）</strong>をオフにする。</span
+        >
+        <p>
+          表示もレンダリングもされたまま、<strong>ビューポートでクリックしても選択されなくなる。</strong>「見えているけど触れない」はこれだけ。
+        </p>
+        <p>
+          矢印アイコンは<strong>デフォルトでは表示されていない</strong>ので、アウトライナーのフィルター（じょうご）で先に出す。設定は <code>.blend</code> ファイルに保存される。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Prereq</span>前提：矢印アイコンを出す</h2>
+        <ul class="ticks">
+          <li>
+            アウトライナー（右上のリスト）の各行に、既定では矢印アイコンが<strong>並んでいない</strong>。フィルターでオンにするまで、ロックの切り替え口そのものが無い
+          </li>
+          <li>
+            これは<strong>オブジェクト単位の機能</strong>。編集モードの中（頂点・辺・面）には同じ仕組みが無い
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Steps</span>手順</h2>
+        <ol class="steps">
+          <li>
+            アウトライナーの<strong>右上にあるフィルターアイコン（じょうご）</strong>をクリックする。
+          </li>
+          <li>
+            <strong>「制限の切り替え」</strong>の並びにある<strong>矢印（カーソル）アイコン</strong>をオンにする。
+          </li>
+          <li>
+            各オブジェクトの行に矢印アイコンが追加される。
+          </li>
+          <li>
+            ロックしたいオブジェクトの<strong>矢印をクリックしてオフ</strong>にする。
+            <p>解除は同じ矢印をもう一度クリックするだけ。</p>
+          </li>
+        </ol>
+        <div class="note">
+          <p>
+            この設定は <code>.blend</code> ファイルに保存される。ファイルを開き直してもロックは残る。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Practice</span>コレクション単位でロックする</h2>
+        <p>
+          オブジェクトを1つずつロックするより、<strong>コレクションごとロックする</strong>ほうが管理が楽。
+        </p>
+        <pre><code>背景セット      ← 選択を無効化
+ライト          ← 選択を無効化
+カメラ          ← 選択を無効化
+作業中のモデル  ← ロックしない</code></pre>
+        <p>
+          <strong>コレクションの行の矢印アイコンをオフにすると、中身すべてがまとめてロックされる。</strong>
+        </p>
+        <p>
+          モデリングの途中で「床をうっかり動かしてしまった」「ライトを掴んでしまった」が激減する。シーンが複雑になるほど効く。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Compare</span>他の「触らせない」方法との違い</h2>
+        <p>
+          Blender には似たような機能が複数ある。<strong>表示 / 選択 / レンダリング</strong>の3つの軸で整理すると混乱しない。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">ビューポート表示</th>
+                <th scope="col">選択</th>
+                <th scope="col">レンダリング</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="hit">
+                <th scope="row">選択を無効化（矢印）</th>
+                <td>される</td>
+                <td><span class="no">できない</span></td>
+                <td>される</td>
+              </tr>
+              <tr>
+                <th scope="row">非表示（目アイコン / <code>H</code>）</th>
+                <td>されない</td>
+                <td>できない</td>
+                <td><strong>される</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">レンダー無効（カメラアイコン）</th>
+                <td>される</td>
+                <td>できる</td>
+                <td><strong>されない</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">コレクションの除外（チェックボックス）</th>
+                <td>されない</td>
+                <td>できない</td>
+                <td>されない</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>Photoshop のロックに一番近いのは「選択を無効化」。</strong>「見えているけど触れない」のはこれだけ。
+        </p>
+
+        <h3>使い分け</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">使うもの</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="hit">
+                <th scope="row">見たままにして、誤クリックだけ防ぎたい</th>
+                <td><strong>選択を無効化（矢印）</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">邪魔なので一時的に消したい</th>
+                <td><code>H</code>（<code>Alt+H</code> で全部戻る）</td>
+              </tr>
+              <tr>
+                <th scope="row">ビューポートには出すが、レンダリングには出したくない</th>
+                <td>カメラアイコン</td>
+              </tr>
+              <tr>
+                <th scope="row">シーンから完全に外して軽くしたい</th>
+                <td>コレクションの除外</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Pitfalls</span>つまずきやすい点</h2>
+
+        <h3>「なぜか選択できないオブジェクトがある」</h3>
+        <p>
+          フィルターで矢印アイコンを非表示に戻すと、<strong>ロック状態は残ったままアイコンだけ見えなくなる。</strong>
+        </p>
+        <p class="fix">
+          まずフィルター（じょうご）で矢印を表示し、どの行がオフになっているか確認する。
+        </p>
+
+        <h3>編集モードの中では使えない</h3>
+        <p>
+          <strong>編集モードの中（頂点・辺・面）にはこの機能はない。</strong>編集モードで触りたくない部分は <code>H</code> で非表示にする（<code>Alt+H</code> で戻る）。
+        </p>
+
+        <h3>ロックしても自動では動く</h3>
+        <p>
+          ロックしたオブジェクトも<strong>モディファイアやコンストレイントの影響は受ける</strong>。あくまで「手で選べない」だけ。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
