@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>レンダリングでワールドの照明が効かない</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      h3 .tag {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 999px;
+        padding: 0.1rem 0.5rem;
+        margin-right: 0.5rem;
+        white-space: nowrap;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      /* UI のパス（プロパティ > タブ > 項目） */
+      p.path {
+        max-width: var(--measure);
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+        margin: 0 0 0.9rem;
+      }
+      p.path strong {
+        color: var(--fg);
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 4列以上の表 */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td strong {
+        color: var(--accent-ink);
+      }
+      tr.hit td,
+      tr.hit th {
+        background: var(--accent-bg);
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順・確認の順番。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+      /* 0 から数えるチェック順 */
+      ol.steps.from-zero {
+        counter-reset: step -1;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* 「→ こうする」の対処行。矢印は absolute で置く */
+      p.fix {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-bottom: 1.1rem;
+      }
+      p.fix::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        width: 1.2rem;
+        text-align: left;
+        color: var(--accent);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+      .note.warn {
+        background: var(--accent-bg);
+        border-color: var(--accent-line);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>レンダリングでワールドの照明が効かない</h1>
+        <p class="standfirst">
+          ビューポートでは効いているのに、レンダリングすると背景が黒／透明になる、または明るさが足りない。<strong>まず「背景が出ているか」で切り分ける</strong>と、見る場所が一気に絞れる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >結論：症状別に2つ。<strong>背景が透明（市松模様）なら「フィルム &gt; 透過」</strong>、<strong>ビューポートだけ明るいなら内蔵のプレビュー照明を見ている。</strong></span
+        >
+        <p>
+          前者は<strong>背景の見た目だけ</strong>を消す機能で、ワールドからの光はオブジェクトに当たり続けている。チェックを外せば背景も出る。
+        </p>
+        <p>
+          後者はビューポートシェーディングの<strong>「シーンのライト」「シーンのワールド」</strong>が初期状態でオフになっているケース。Blender 内蔵のスタジオライト／プレビュー HDRI で照らされていただけで、<strong>レンダリングには一切反映されない。</strong>
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Triage</span>まず切り分け：背景は出ているか</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">症状</th>
+                <th scope="col">向かう先</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">背景が透明（市松模様）</th>
+                <td>原因1（フィルムの透過）</td>
+              </tr>
+              <tr>
+                <th scope="row">背景が真っ黒</th>
+                <td>原因2・3・5</td>
+              </tr>
+              <tr>
+                <th scope="row">背景は出ているが暗い</th>
+                <td>原因2（強さ）・原因6</td>
+              </tr>
+              <tr class="hit">
+                <th scope="row">ビューポートでは見えるがレンダーだけ出ない</th>
+                <td>
+                  <strong>原因0（ビューポート専用ライティング）をまず疑う。</strong>次に原因3
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>確認の順番</h3>
+        <ol class="steps from-zero">
+          <li>
+            ビューポートシェーディングの<strong>シーンのライト / シーンのワールド</strong>のチェック
+            <p>＝内蔵ライティングを見ていないか。</p>
+          </li>
+          <li>レンダープロパティ &gt; フィルム &gt; <strong>透過</strong>のチェック</li>
+          <li>ワールドプロパティ &gt; <strong>強さ</strong>とカラー</li>
+          <li>ビューレイヤープロパティ &gt; フィルター &gt; <strong>環境</strong></li>
+          <li>シェーダーエディタ（ワールド）で<strong>ノードの接続</strong></li>
+          <li>オブジェクトプロパティ &gt; 可視性 &gt; <strong>レイの可視性</strong></li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>
+          <span class="lead">Cause 0</span>そもそもビューポート専用のライティングだった
+        </h2>
+        <p>
+          <strong>2026-10-07 に実際に遭遇したケース。</strong>ビューポートで明るく見えていたのは
+          <strong>Blender 内蔵のプレビュー用ライティング</strong>であって、シーンのワールドではなかった。<strong>ビューポート表示専用の設定なので、レンダリングには一切反映されない。</strong>
+        </p>
+
+        <figure>
+          <svg viewBox="0 0 600 230" role="img" aria-label="内蔵のプレビュー照明はビューポートにしか届かず、レンダリングにはシーンのワールドだけが届くことを示す図">
+            <g
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1"
+              opacity="0.85"
+            >
+              <rect x="8" y="14" width="196" height="54" rx="8" stroke-dasharray="4 3" />
+              <rect x="8" y="150" width="196" height="54" rx="8" />
+              <rect x="394" y="14" width="198" height="54" rx="8" />
+              <rect x="394" y="150" width="198" height="54" rx="8" />
+            </g>
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="13"
+            >
+              <text x="106" y="37" text-anchor="middle">Blender 内蔵の</text>
+              <text x="106" y="56" text-anchor="middle">スタジオライト / HDRI</text>
+              <text x="106" y="173" text-anchor="middle">シーンのワールド</text>
+              <text x="106" y="192" text-anchor="middle">シーンのライト</text>
+              <text x="493" y="47" text-anchor="middle">ビューポート表示</text>
+              <text x="493" y="183" text-anchor="middle">レンダリング（F12）</text>
+            </g>
+            <g stroke="currentColor" stroke-width="1.5" fill="none">
+              <path d="M204 41 H386" />
+              <path d="M378 36 l8 5 -8 5" />
+              <path d="M204 177 H386" />
+              <path d="M378 172 l8 5 -8 5" />
+              <path d="M204 170 C 280 150, 300 80, 386 55" />
+              <path d="M379 51 l7 4 -3 8" />
+            </g>
+            <g stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4" fill="none" opacity="0.55">
+              <path d="M204 48 C 280 80, 300 150, 370 170" />
+            </g>
+            <g stroke="currentColor" stroke-width="1.8" opacity="0.9">
+              <path d="M285 110 l14 14 M299 110 l-14 14" />
+            </g>
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="11.5"
+              opacity="0.75"
+            >
+              <text x="315" y="120">届かない</text>
+            </g>
+          </svg>
+          <figcaption>
+            内蔵のプレビュー照明はビューポートで止まる。レンダリングに映るのはシーンのワールドとライトだけ。
+          </figcaption>
+        </figure>
+
+        <h3>ビューポートシェーディングの2つのチェックボックス</h3>
+        <p>
+          ビューポート右上のシェーディング（球アイコン）の <code>v</code>
+          を開くと、<strong>マテリアルプレビュー</strong>と<strong>レンダー</strong>モードに2つのチェックボックスがある。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">チェックボックス</th>
+                <th scope="col">オフのとき（＝Blender 内蔵を使う）</th>
+                <th scope="col">オンのとき</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">シーンのライト（Scene Lights）</th>
+                <td>
+                  Blender 内蔵の<strong>スタジオライト</strong>で照らす。自分が置いたライトは無視される
+                </td>
+                <td>シーンに実際にあるライトを使う</td>
+              </tr>
+              <tr>
+                <th scope="row">シーンのワールド（Scene World）</th>
+                <td>
+                  Blender 内蔵の<strong>プレビュー用 HDRI</strong>で照らす。ワールド設定は無視される
+                </td>
+                <td>シーンのワールドを使う</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note warn">
+          <p>
+            <strong>マテリアルプレビューモードでは、この2つが初期状態でオフ。</strong>
+            だから「何も設定していないのに綺麗に照らされている」状態になる。
+          </p>
+          <p>
+            内蔵ライティングはビューポートの表示設定でしかない。HDRI の種類・回転・強さを変えても、<strong>レンダリング結果には一切影響しない。</strong>
+          </p>
+        </div>
+
+        <h3>見分け方</h3>
+        <p class="fix">
+          ビューポートを<strong>「レンダー」モード（右上の球アイコンの4つ目）</strong>に切り替える。実際のレンダリングと同じ条件で表示される。<strong>ここで暗ければ、本当にシーンのライティングが足りていない。</strong>
+        </p>
+
+        <h3>レンダリングにも反映させるには</h3>
+        <p>
+          内蔵ライティングは「借り物」なので、同じ見た目が欲しければ<strong>自分のシーンに本物として用意する</strong>必要がある。
+        </p>
+        <ol class="steps">
+          <li>
+            <strong>ワールドに HDRI を設定する。</strong>
+            <p>
+              シェーダーエディタを<strong>ワールド</strong>モードに切り替え →
+              追加 &gt; テクスチャ &gt; <strong>環境テクスチャ</strong> を背景ノードのカラーに接続 →
+              HDRI 画像を読み込む（投影は<strong>正距円筒図</strong>）。
+            </p>
+          </li>
+          <li><strong>または実際のライトを置く</strong>（エリアライトなど）。</li>
+        </ol>
+
+        <h3>内蔵 HDRI をそのまま使う裏technique</h3>
+        <p>
+          Blender 内蔵のプレビュー HDRI は、実体は <code>.exr</code>
+          ファイルとしてインストールフォルダに入っている。これを環境テクスチャに読み込めば、<strong>ビューポートで見えていたのと同じライティングをレンダリングでも使える。</strong>
+        </p>
+        <p class="path">macOS の場合:</p>
+        <pre><code>/Applications/Blender.app/Contents/Resources/&lt;バージョン&gt;/datafiles/studiolights/world/</code></pre>
+        <p>
+          バージョン番号のフォルダ名は環境によって異なる。<code>forest.exr</code>、<code>studio.exr</code>
+          などが入っている。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Cause 1</span>フィルムの「透過」がオン（最多）</h2>
+        <p class="path">
+          <strong>レンダープロパティ &gt; フィルム &gt; 透過（Transparent）</strong>
+        </p>
+        <p>
+          オンにすると<strong>背景が透明</strong>になり、レンダー画像では市松模様になる。合成前提のときに使う機能。
+        </p>
+        <p class="fix">背景も出したいなら、<strong>透過のチェックを外す。</strong></p>
+
+        <h3><span class="tag">重要</span>透過をオンにしても、ワールドの照明は効いている</h3>
+        <p>
+          ここが誤解されやすい。透過は<strong>背景の「見た目」を消すだけ</strong>で、<strong>ワールドからの光はオブジェクトに当たり続ける。</strong>
+        </p>
+        <p>
+          つまり「背景が出ない＝照明も効いていない」ではない。反射や環境光は入っているので、本当に照明まで消したいなら別の設定が必要。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Cause 2</span>ワールドの強さが 0、またはカラーが黒</h2>
+        <p class="path">
+          <strong>ワールドプロパティ（赤い地球のアイコン）&gt; サーフェス &gt; 強さ</strong>
+        </p>
+        <ul class="ticks">
+          <li><strong>強さが 0</strong> → 光も背景も出ない</li>
+          <li><strong>カラーが真っ黒</strong> → 同上</li>
+        </ul>
+        <p>
+          デフォルトは <code>1.0</code>。ここをいじった覚えがなくても、<strong>ファイルを他所から持ってきた場合は確認する。</strong>
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Cause 3</span>ビューレイヤーの「環境」フィルターがオフ</h2>
+        <p class="path">
+          <strong
+            >ビューレイヤープロパティ（重なった画像のアイコン）&gt; フィルター &gt;
+            環境（Environment）</strong
+          >
+        </p>
+        <p>
+          ここのチェックが外れていると、<strong>そのビューレイヤーのレンダリングからワールドが除外される。</strong>
+        </p>
+        <p>
+          <strong>ビューポートでは普通に見えているのにレンダリングだけ出ない</strong>、という症状の典型的な原因。見つけにくい場所にあるので、他を確認しても直らないときはここを疑う。
+        </p>
+      </section>
+
+      <section>
+        <h2>
+          <span class="lead">Cause 4</span>ワールドのノードが繋がっていない / ワールドが未割り当て
+        </h2>
+        <ul class="ticks">
+          <li>
+            シェーダーエディタの左上を<strong>「ワールド」</strong>に切り替えて、<strong>背景ノードのカラー出力が「ワールド出力」に繋がっているか</strong>確認する
+          </li>
+          <li>
+            ワールドプロパティの一番上で、<strong>ワールドデータが割り当てられているか</strong>（空欄になっていないか）確認する
+          </li>
+        </ul>
+        <p>
+          HDRI を設定したつもりで、<strong>環境テクスチャノードが宙に浮いている</strong>ケースがよくある。
+        </p>
+      </section>
+
+      <section>
+        <h2>
+          <span class="lead">Cause 5</span>オブジェクト側でワールドの光を受けない設定になっている
+        </h2>
+        <p class="path">
+          <strong>オブジェクトプロパティ &gt; 可視性 &gt; レイの可視性</strong>（Cycles）
+        </p>
+        <ul class="ticks">
+          <li>
+            <strong>ディフューズ</strong> / <strong>グロッシー</strong>
+            のチェックが外れていると、そのオブジェクトはワールドからの光を受けない
+          </li>
+          <li><strong>ホールドアウト</strong>がオンだと、そのオブジェクトの部分が切り抜かれる</li>
+        </ul>
+        <p><strong>特定のオブジェクトだけ暗い場合はここ。</strong></p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Cause 6</span>EEVEE 固有の設定</h2>
+        <p>EEVEE はワールドからの間接光の扱いが Cycles と違う。</p>
+        <ul class="ticks">
+          <li><strong>レンダープロパティ &gt; レイトレース</strong> を有効にすると、より正確になる</li>
+          <li>
+            反射や環境光が弱いと感じる場合は、ここと<strong>「高速GI近似」</strong>の設定を確認する
+          </li>
+        </ul>
+        <p class="fix">
+          <strong>Cycles で確認して問題なければ</strong>、EEVEE 側の設定の問題と切り分けられる。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Inverse</span>補足：ビューポートで見えない場合は逆の原因</h2>
+        <p>
+          「ビューポートでワールドが見えない、レンダリングでは出る」なら、ビューポートシェーディングの<strong>シーンのワールド</strong>のチェックを入れる。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
