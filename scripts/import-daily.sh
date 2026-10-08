@@ -132,8 +132,6 @@ if [ -n "$(git status --porcelain)" ]; then
   abort "作業ツリーに未コミットの変更があります（巻き戻しで巻き添えにするため実行しません）"
 fi
 
-start_commit="$(git rev-parse HEAD)"
-
 # --- claude の認証を確認する ---------------------------------------------
 #
 # 2026-10-01〜10-02、OAuth トークンが期限切れになり、分類も執筆も毎回 5〜9 秒で
@@ -200,15 +198,30 @@ fi
 count="$(echo "$pending_json" | jq 'length')"
 log "未取り込み: ${count} 件"
 
-if [ "$count" -eq 0 ]; then
+# push だけ取り残されていないかを確認する。
+# 2026-10-08、push が GitHub 側の一時エラーで失敗してコミットがローカルに残った翌晩、
+# 新しく取り込む md が無かったために「何もせず終了」してしまい、
+# 取り残された1件がそのまま丸1日 origin に出なかった。
+# 新規の取り込みが無くても、push し残しがあれば検証してここで push する
+ahead=0
+if git rev-parse --verify --quiet "origin/$BRANCH" >/dev/null; then
+  ahead="$(git rev-list --count "origin/$BRANCH..HEAD" 2>/dev/null || echo 0)"
+fi
+
+if [ "$count" -eq 0 ] && [ "$ahead" -eq 0 ]; then
   log "=== 何もせず終了 ==="
   exit 0
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "$pending_json" | jq -r '.[] | "  " + .file'
+  [ "$ahead" -gt 0 ] && log "push し残しが ${ahead} 件あります"
   log "=== --dry-run のため終了 ==="
   exit 0
+fi
+
+if [ "$count" -eq 0 ]; then
+  log "新規の取り込みは無し。push し残し ${ahead} 件を検証して push します"
 fi
 
 # 体裁を合わせる参考として、直近のページを 1 つ選ぶ
@@ -379,8 +392,11 @@ done < <(echo "$pending_json" | jq -r '.[].file')
 
 log "--- 結果: 作成 ${created} / 見送り ${skipped} / 失敗 ${failed} ---"
 
-if [ "$(git rev-parse HEAD)" = "$start_commit" ]; then
-  log "=== 新しいコミットなし。終了 ==="
+# 「push する価値があるか」は今回新しく作ったコミットの有無ではなく、
+# origin に対して進んでいるかで判定する。これなら前回の push し残しも拾える
+origin_head="$(git rev-parse --verify --quiet "origin/$BRANCH" 2>/dev/null || true)"
+if [ -n "$origin_head" ] && [ "$(git rev-parse HEAD)" = "$origin_head" ]; then
+  log "=== push する差分なし。終了 ==="
   if [ "$skipped" -gt 0 ] || [ "$failed" -gt 0 ]; then
     notify "取り込めませんでした" "見送り ${skipped} / 失敗 ${failed}。ログを確認してください"
   fi
