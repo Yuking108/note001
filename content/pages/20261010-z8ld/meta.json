@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "20261010-z8ld",
+  "title": "コンポジター下部のアセットシェルフを消す",
+  "summary": "ビュー メニュー > アセットシェルフ のチェックを外せば消える（エディターごとの設定なので他エディターには影響しない）。上端の境界をドラッグすれば畳むだけにもでき、中身は Blender 5.0 でコンポジターに追加された標準ノードアセット（Vignette、Film Grain、色収差など）。",
+  "mainLabel": "Blender/コンポジティング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/ユーザーインターフェース",
+    "Blender/レンダリング"
+  ],
+  "createdAt": "2026-10-10",
+  "updatedAt": "2026-10-10",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A/Q&A_コンポジターの下部のアセットシェルフを消す.md",
+    "note": "docs/Q&A/Q&A_コンポジターの下部のアセットシェルフを消す.md を夜間取り込みでページ化したもの"
+  }
+}

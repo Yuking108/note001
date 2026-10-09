@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>コンポジター下部のアセットシェルフを消す</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      /* UI のパス（メニュー > 項目） */
+      p.path {
+        max-width: var(--measure);
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+        margin: 0 0 0.9rem;
+      }
+      p.path strong {
+        color: var(--fg);
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>コンポジター下部のアセットシェルフを消す</h1>
+        <p class="standfirst">
+          コンポジターの下に <code>Film Grain</code> / <code>Vignette</code> / <code>Sepia</code>
+          などのサムネイルが横一列に並んでいる領域。これは<strong>アセットシェルフ</strong>で、ビューメニューから消せる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >結論：<strong>ビュー メニュー &gt; アセットシェルフ</strong> のチェックを外す。</span
+        >
+        <p>
+          戻すのも同じ場所。<strong>エディターごとの設定</strong>なので、コンポジターで消しても他のエディターには影響しない。
+        </p>
+        <p>
+          完全に消さずに隠しておきたいなら、<strong>シェルフの上端の境界をドラッグして下げる</strong>（畳むだけ）。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Fix</span>消し方</h2>
+        <p class="path"><strong>ビュー メニュー &gt; アセットシェルフ</strong></p>
+        <ol class="steps">
+          <li>
+            コンポジターの<strong>ビュー</strong>メニューを開く。
+          </li>
+          <li>
+            <strong>アセットシェルフ</strong>のチェックを外す。
+            <p>下部のサムネイルの列が消える。戻すときは同じ項目にチェックを入れる。</p>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Alt</span>畳むだけにする</h2>
+        <p>
+          必要なときだけ開きたい場合は、<strong>シェルフの上端の境界をドラッグして下げる。</strong>細いバーだけが残り、<strong>クリックで開き直せる。</strong>
+        </p>
+
+        <figure>
+          <svg
+            viewBox="0 0 600 190"
+            role="img"
+            aria-label="アセットシェルフを下端までドラッグすると細いバーだけが残り、クリックで開き直せることを示す図"
+          >
+            <g fill="none" stroke="currentColor" stroke-width="1" opacity="0.85">
+              <rect x="8" y="16" width="250" height="150" rx="8" />
+              <rect x="8" y="112" width="250" height="54" />
+              <rect x="342" y="16" width="250" height="150" rx="8" />
+              <rect x="342" y="150" width="250" height="16" />
+            </g>
+            <g fill="currentColor" opacity="0.4">
+              <rect x="22" y="128" width="26" height="22" rx="3" />
+              <rect x="56" y="128" width="26" height="22" rx="3" />
+              <rect x="90" y="128" width="26" height="22" rx="3" />
+              <rect x="124" y="128" width="26" height="22" rx="3" />
+              <rect x="158" y="128" width="26" height="22" rx="3" />
+            </g>
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="13"
+            >
+              <text x="133" y="70" text-anchor="middle">ノードエディタ</text>
+              <text x="133" y="106" text-anchor="middle" font-size="11.5" opacity="0.75">
+                アセットシェルフ
+              </text>
+              <text x="467" y="70" text-anchor="middle">ノードエディタ</text>
+              <text x="467" y="140" text-anchor="middle" font-size="11.5" opacity="0.75">
+                細いバーだけが残る
+              </text>
+            </g>
+            <g stroke="currentColor" stroke-width="1.5" fill="none">
+              <path d="M266 91 H334" />
+              <path d="M326 86 l8 5 -8 5" />
+            </g>
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="11.5"
+              opacity="0.75"
+            >
+              <text x="300" y="80" text-anchor="middle">境界を</text>
+              <text x="300" y="112" text-anchor="middle">ドラッグ</text>
+            </g>
+          </svg>
+          <figcaption>
+            上端の境界を下げると、シェルフは閉じた細いバーになる。クリックでまた開く。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">What</span>これは何なのか</h2>
+        <p>
+          <strong>Blender 5.0 でコンポジターに追加されたアセットシェルフ。</strong>Blender
+          に最初から入っている<strong>ノードアセット</strong>（ノードグループ）が並んでいる。
+        </p>
+        <ul class="ticks">
+          <li>
+            <strong>すべて / Camera &amp; Lens Effects / Creative / Utilities</strong>
+            のタブで分類されている
+          </li>
+          <li>
+            サムネイルを<strong>ノードエディタにドラッグ＆ドロップ</strong>すると、そのエフェクトのノードグループが追加される
+          </li>
+          <li>右の検索欄で名前から探せる</li>
+        </ul>
+
+        <h3>入っているものの例</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">分類</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Camera &amp; Lens Effects</th>
+                <td>
+                  Chromatic Aberration（色収差）、Depth of Field、Vignette、Film Grain、Sensor Noise
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Creative</th>
+                <td>Sepia、Split Tone、Night Vision、Paint Filter</td>
+              </tr>
+              <tr>
+                <th scope="row">Utilities</th>
+                <td>Dithering、Unsharp Mask、Exposure、Position、Retime</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          従来は自分でノードを組むか、配布されているノードグループを探す必要があった処理が、<strong>標準で用意された</strong>形。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Note</span>消す前に一度見ておく価値はある</h2>
+        <p>
+          <code>Vignette</code>（周辺光量落ち）、<code>Film Grain</code>（粒子感）、<code
+            >Chromatic Aberration</code
+          >（色収差）あたりは、<strong>レンダリング結果を「写真らしく」仕上げるのに定番の処理。</strong>自分でノードを組むと手間がかかるので、ここから持ってくると速い。
+        </p>
+        <div class="note">
+          <p>
+            作業中に邪魔なら消しておいて、<strong>仕上げのときだけビューメニューから出す</strong>、という使い方でよい。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
