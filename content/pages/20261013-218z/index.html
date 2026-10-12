@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>物体のサイズとライティングの関係（距離・パワー・影のやわらかさ）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が4つ以上の表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      td.num,
+      th.num {
+        font-family: var(--font-mono);
+        font-size: 0.88rem;
+        white-space: nowrap;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      .closing {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>物体のサイズとライティングの関係（距離・パワー・影のやわらかさ）</h1>
+        <p class="standfirst">
+          物体が小さいのにライトを近くに置くと白飛びする。原因は物体のサイズそのものではなく、<strong>サイズに対してライトが近すぎること</strong>。ライティングは絶対値ではなく<strong>比率</strong>で決まる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big">結論：覚えるのは「3つの比」だけ。</span>
+        <p>
+          <strong>パワー ÷ 距離²</strong>（明るさ）、<strong>ライトのサイズ ÷ 距離</strong>（影のやわらかさ）、<strong>距離 ÷ 物体サイズ</strong>（物体内の明暗差）。この3つを押さえれば、どんなサイズの物体でも同じ手順で寄せられる。
+        </p>
+        <p>
+          そして最初に選ぶべきは<strong>実寸でモデリングすること</strong>。これだけでチュートリアルのパワー値がそのまま使える。スケールに悩まされたくないなら、<strong>Sun と World を主役にする</strong>のが一番安全（どちらも距離の影響を受けない）。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Ratios</span>3つの比</h2>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">比</th>
+                <th scope="col">決まるもの</th>
+                <th scope="col">効き方</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row" class="num">1</th>
+                <td><strong>パワー ÷ 距離²</strong></td>
+                <td>明るさ（量）</td>
+                <td><code>明るさ ∝ パワー ÷ 距離²</code></td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">2</th>
+                <td><strong>ライトのサイズ ÷ 距離</strong></td>
+                <td>影のやわらかさ（質）</td>
+                <td>比が大きいほどソフト</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">3</th>
+                <td><strong>距離 ÷ 物体サイズ</strong></td>
+                <td>物体内の明暗差</td>
+                <td>比が小さいほど片側だけ白飛び</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <strong>物体サイズそのものは明るさに直接関係しない。</strong>効いているのは「物体サイズに対して<strong>どれだけ近い</strong>か」＝ 比 3。それが比 1 の距離を小さくし、二乗で明るくなって白飛びする。
+        </p>
+
+        <figure>
+          <svg
+            viewBox="0 0 600 300"
+            role="img"
+            aria-label="物体サイズ L が小さいと距離 d も小さくなり、距離 d はライトのサイズ S と組んで影のやわらかさ（S ÷ d）、パワー P と組んで明るさ（P ÷ d²）、物体サイズ L と組んで物体内の明暗差（d ÷ L）を決めることを示す関係図"
+          >
+            <g fill="none" stroke="currentColor" stroke-width="1" opacity="0.8">
+              <rect x="10" y="16" width="170" height="42" rx="6" />
+              <rect x="215" y="16" width="170" height="42" rx="6" />
+              <rect x="420" y="16" width="170" height="42" rx="6" />
+              <rect x="215" y="118" width="170" height="45" rx="6" />
+              <rect x="10" y="228" width="170" height="62" rx="6" />
+              <rect x="215" y="228" width="170" height="62" rx="6" />
+              <rect x="420" y="228" width="170" height="62" rx="6" />
+            </g>
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="13"
+            >
+              <text x="95" y="42" text-anchor="middle">ライトのサイズ S</text>
+              <text x="300" y="42" text-anchor="middle">物体サイズ L</text>
+              <text x="505" y="42" text-anchor="middle">パワー P</text>
+              <text x="300" y="146" text-anchor="middle" font-size="15">距離 d</text>
+            </g>
+            <g
+              fill="currentColor"
+              font-family="ui-monospace, Menlo, monospace"
+              font-size="14"
+              font-weight="700"
+            >
+              <text x="95" y="256" text-anchor="middle">S / d</text>
+              <text x="300" y="256" text-anchor="middle">P / d²</text>
+              <text x="505" y="256" text-anchor="middle">d / L</text>
+            </g>
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="12"
+              opacity="0.75"
+            >
+              <text x="95" y="277" text-anchor="middle">影のやわらかさ</text>
+              <text x="300" y="277" text-anchor="middle">明るさ（二乗で効く）</text>
+              <text x="505" y="277" text-anchor="middle">物体内の明暗差</text>
+              <text x="396" y="82">L が小さいと</text>
+              <text x="396" y="100">d も小さくなる</text>
+            </g>
+            <g stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.8">
+              <path d="M300 58 V112" />
+              <path d="M295 104 l5 8 5 -8" />
+              <path d="M95 58 V222" />
+              <path d="M90 214 l5 8 5 -8" />
+              <path d="M505 58 V222" />
+              <path d="M500 214 l5 8 5 -8" />
+              <path d="M300 163 V222" />
+              <path d="M295 214 l5 8 5 -8" />
+              <path d="M240 163 L150 220" />
+              <path d="M160 211 l-10 9 2 -13" />
+              <path d="M360 163 L450 220" />
+              <path d="M440 211 l10 9 -2 -13" />
+            </g>
+          </svg>
+          <figcaption>
+            距離 d が3つすべてに入る。だから「物体が小さい」のではなく「d が小さい」のが原因になる。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Choice</span>どのライトを主役にするか</h2>
+        <p>
+          スケールの影響を受けるかどうかで、ライトは3種類に分かれる。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">種類</th>
+                <th scope="col">単位</th>
+                <th scope="col">距離の影響</th>
+                <th scope="col">サイズの影響</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ポイント／スポット／エリア</th>
+                <td class="num">W</td>
+                <td><strong>逆二乗で効く</strong></td>
+                <td>影のやわらかさ</td>
+              </tr>
+              <tr>
+                <th scope="row">Sun（サン）</th>
+                <td class="num">W/m²</td>
+                <td><strong>なし</strong></td>
+                <td><code>Angle</code> が影のやわらかさ（既定 0.526° ＝実際の太陽）</td>
+              </tr>
+              <tr>
+                <th scope="row">World / HDRI</th>
+                <td>係数</td>
+                <td><strong>なし</strong></td>
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>スケールに悩まされたくないなら Sun と World を主役にする。</strong>小物の撮影でも、Sun ＋ World
+          だけならシーンを縮小しても露出が崩れない。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Setup</span>距離とパワーの決め方</h2>
+
+        <h3>距離 ＝ 物体サイズの 2〜5 倍</h3>
+        <p>
+          近すぎると白飛び＋のっぺり、遠すぎると立体感が消える。<code>距離 ÷ 物体サイズ</code> が
+          2〜5 に入っていれば、物体内の明暗差はちょうどいい範囲になる。
+        </p>
+
+        <h3>パワーの開始値（経験式）</h3>
+        <pre><code>開始パワー（W） ≈ 20 × 距離（m）²</code></pre>
+        <p>
+          Blender のデフォルトシーン（原点から約 7 m のポイントライト ＝ 1000 W）と概ね一致する目安。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">ライトまでの距離</th>
+                <th scope="col">開始パワー</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row" class="num">0.1 m</th><td class="num"><strong>0.2 W</strong></td></tr>
+              <tr><th scope="row" class="num">0.2 m</th><td class="num">0.8 W</td></tr>
+              <tr><th scope="row" class="num">0.5 m</th><td class="num">5 W</td></tr>
+              <tr><th scope="row" class="num">1 m</th><td class="num"><strong>20 W</strong></td></tr>
+              <tr><th scope="row" class="num">2 m</th><td class="num">80 W</td></tr>
+              <tr><th scope="row" class="num">3 m</th><td class="num">180 W</td></tr>
+              <tr><th scope="row" class="num">5 m</th><td class="num">500 W</td></tr>
+              <tr><th scope="row" class="num">7 m</th><td class="num"><strong>1000 W</strong></td></tr>
+              <tr><th scope="row" class="num">10 m</th><td class="num">2000 W</td></tr>
+              <tr><th scope="row" class="num">20 m</th><td class="num">8000 W</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <p>
+            エリアライトは面積が大きいと体感がやや暗くなるので <strong>1.5〜2 倍</strong>から試す。
+          </p>
+          <p>
+            あとは <strong>露出（Exposure）</strong>で微調整（<code>+1 = 2倍</code>、<code>-1 = 1/2</code>）。
+          </p>
+        </div>
+
+        <h3>影のやわらかさ ＝ ライトのサイズ ÷ 距離</h3>
+        <p>
+          影のやわらかさは、<strong>物体から見たライトの「見かけの大きさ（角度）」</strong>で決まる。1 m
+          のエリアライトを 1 m に置くのは、10 m のライトを 10 m に置くのと同じやわらかさになる。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">サイズ ÷ 距離</th>
+                <th scope="col">影</th>
+                <th scope="col">例え</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row" class="num">〜0.05</th>
+                <td>カチッと硬い影</td>
+                <td>晴天の太陽、裸電球</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">0.1〜0.3</th>
+                <td>自然なやわらかさ</td>
+                <td>窓明かり、ソフトボックス</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">0.5〜1.0</th>
+                <td>かなりソフト</td>
+                <td>大型ディフューザー</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">2.0〜</th>
+                <td>影がほぼ消える</td>
+                <td>曇天、ライトボックスの中</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>判断の根拠</h2>
+
+        <h3>1. 明るさは逆二乗則で決まる</h3>
+        <pre><code>明るさ（照度） ∝ パワー ÷ 距離²</code></pre>
+        <ul class="ticks">
+          <li>距離が <strong>1/2</strong> → 明るさ <strong>4倍</strong></li>
+          <li>距離が <strong>1/10</strong> → 明るさ <strong>100倍</strong></li>
+          <li>距離が <strong>2倍</strong> → 明るさ <strong>1/4</strong></li>
+        </ul>
+        <p>これは Blender のマニュアルの定義どおりの挙動。</p>
+        <blockquote class="manual">
+          <p>
+            <strong>Power</strong>（ポイント／スポット／エリア）: <em
+              >“Power of the light in Watts. Higher values increase the intensity of the light.”</em
+            >
+          </p>
+          <p>
+            <strong>Sun の Strength</strong>: <em>“Strength of the lights in Watts per square meter.”</em>
+          </p>
+        </blockquote>
+        <p>
+          ポイント／スポット／エリアは <strong>W（総放射パワー）</strong>なので距離で薄まる。Sun は
+          <strong>W/m²（その場所に届く量そのもの）</strong>なので<strong>距離は一切関係しない</strong>。
+        </p>
+
+        <h3>2. スケール不変の法則（いちばん重要）</h3>
+        <p>
+          <strong>シーン全体を k 倍すると、同じ見た目にするにはパワーを k² 倍にする必要がある。</strong>距離が
+          <code>d → k·d</code> になるので：
+        </p>
+        <pre><code>P / (k·d)²  =  (P / k²) / d²     ← k² 分だけ暗くなる
+∴ 必要なパワー = 元のパワー × k²</code></pre>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">シーンの大きさ</th>
+                <th scope="col">必要なパワー</th>
+                <th scope="col">同じパワーのままだと</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row" class="num">1/10 倍</th>
+                <td class="num">×0.01</td>
+                <td><strong>100倍明るい（＝白飛び）</strong></td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">1/5 倍</th>
+                <td class="num">×0.04</td>
+                <td>25倍明るい</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">1/2 倍</th>
+                <td class="num">×0.25</td>
+                <td>4倍明るい</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">等倍</th>
+                <td class="num">×1</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">2倍</th>
+                <td class="num">×4</td>
+                <td>1/4 の明るさ</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">5倍</th>
+                <td class="num">×25</td>
+                <td>1/25 の明るさ</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">10倍</th>
+                <td class="num">×100</td>
+                <td>1/100 の明るさ（真っ暗）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          これが<strong>チュートリアルの「2000 W」が合わない理由</strong>。チュートリアルは<strong>人間スケール（物体
+          1〜2 m、ライト 5〜10 m）</strong>で作られている。自分のシーンが 1/10 のサイズ（物体 20 cm、ライト 1
+          m）だと、同じ 2000 W は<strong>約100倍明るい</strong> → 当然白飛びする。
+        </p>
+
+        <h3>3. 距離 ÷ 物体サイズ が物体内の明暗差を決める</h3>
+        <p>
+          ライトが物体に近いと、<strong>手前の面と奥の面で距離が大きく違う</strong>ので、1つの物体の中で明るさが激変する。
+        </p>
+        <pre><code>明暗差 = ((d + L) / d)²
+   d = ライトから手前の面までの距離
+   L = 物体の奥行き</code></pre>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">d / L</th>
+                <th scope="col">手前と奥の明るさ比</th>
+                <th scope="col">見た目</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row" class="num">0.5</th>
+                <td class="num"><strong>9倍</strong></td>
+                <td>手前だけ白飛び、奥は真っ暗</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">1</th>
+                <td class="num"><strong>4倍</strong></td>
+                <td>かなり強いグラデーション</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">2</th>
+                <td class="num">2.25倍</td>
+                <td>立体感が出て良い範囲</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">3</th>
+                <td class="num">1.78倍</td>
+                <td>自然</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">5</th>
+                <td class="num">1.44倍</td>
+                <td>ほぼ均一</td>
+              </tr>
+              <tr>
+                <th scope="row" class="num">10</th>
+                <td class="num">1.21倍</td>
+                <td>均一（平板に見えがち）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>4. エリアライトのサイズを変えても「総パワー」は変わらない</h3>
+        <p>
+          <code>Power</code> は<strong>ランプ全体が出す総ワット数</strong>なので、サイズを大きくしても総量は同じ。変わるのは
+          <strong>①影のやわらかさ ②ハイライトの大きさ ③単位面積あたりの明るさ（＝ライト自体の見た目の明るさ）</strong>。
+        </p>
+        <div class="note">
+          <p>
+            ただし<strong>ライトが物体に極端に近い場合</strong>は、サイズを大きくすると「壁のような面光源」になり、物体に届く量が実質増えて明るく見えることがある。<strong>サイズをいじったら明るさは必ず再確認する。</strong>
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Base</span>実寸の基準表</h2>
+        <p>
+          <strong>最初に実寸でモデリングしておけば、ライトのパワーはチュートリアルの値がそのまま使える。</strong>これが白飛び対策としては最も効く。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">対象</th>
+                <th scope="col">実寸</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Blender のデフォルト立方体</th><td class="num">2 m</td></tr>
+              <tr><th scope="row">人（身長）</th><td class="num">1.7 m</td></tr>
+              <tr><th scope="row">ドア</th><td class="num">0.9 × 2.0 m</td></tr>
+              <tr><th scope="row">机</th><td class="num">1.2 × 0.7 × 0.72 m</td></tr>
+              <tr><th scope="row">A4 用紙</th><td class="num">0.21 × 0.297 m</td></tr>
+              <tr><th scope="row">スマホ</th><td class="num">0.07 × 0.15 m</td></tr>
+              <tr><th scope="row">マグカップ</th><td class="num">0.09 m</td></tr>
+              <tr><th scope="row">1 円玉</th><td class="num">0.02 m</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Check</span>白飛びしたときのチェック順</h2>
+        <ol class="steps">
+          <li>
+            <strong>物体の実寸を確認</strong>（<code>N</code> キー → 寸法）。小さすぎないか？
+          </li>
+          <li>
+            <strong>ライトまでの距離を確認。</strong>物体サイズの 2〜5 倍になっているか？
+          </li>
+          <li>
+            <strong><code>20 × 距離²</code> と比べる。</strong>桁がずれていないか？
+          </li>
+          <li>
+            <strong>ビュー変換を確認。</strong>
+            <p>4.0 以降は <code>AgX</code> が既定（Filmic より白飛びしにくい）。</p>
+          </li>
+          <li><strong>露出（Exposure）で詰める。</strong></li>
+          <li>
+            それでも破綻するなら <strong>シーン全体をスケールアップ</strong>して実寸に合わせる。
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Later</span>後回しにしていい手</h2>
+        <ul class="ticks">
+          <li>
+            <strong>露出（Exposure）で合わせる</strong> — 微調整用。<code>+1 = 2倍</code> / <code>-1
+            = 1/2</code> なので、桁がずれているときの解決にはならない
+          </li>
+          <li>
+            <strong>シーン全体をスケールアップする</strong> —
+            いちばん効くが影響範囲が大きい。チェック順の最後に置く
+          </li>
+          <li>
+            <strong>エリアライトのサイズで明るさを稼ぐ</strong> —
+            総パワーは変わらないので筋が悪い。サイズは影のやわらかさを決めるために使う
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li>
+            <strong>ライトのパワーが昔の数値と合わない</strong> — 実際に白飛びした事例と原因切り分け
+          </li>
+          <li>
+            <strong>レンダリングでワールドの照明が効かない</strong> —
+            ビューポート専用ライティングとの違い
+          </li>
+          <li><strong>スペキュラーと IOR</strong> — ハイライトの強さ側の話</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
