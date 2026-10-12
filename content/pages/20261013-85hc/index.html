@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>パーティクルがレンダリングに出ない（レンダービューでは見えている）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      h3 .tag {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        font-weight: 400;
+        letter-spacing: 0.08em;
+        color: var(--fg-muted);
+        margin-right: 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が4つ以上の表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      ul.ticks li {
+        position: relative;
+        padding-left: 1.1rem;
+        line-height: 1.75;
+      }
+      ul.ticks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+
+      /* ❌ / ✅ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>パーティクルがレンダリングに出ない（レンダービューでは見えている）</h1>
+        <p class="standfirst">
+          レンダービューでは出ているのに <code>F12</code> の最終レンダーで消える。これは<strong>レンダー専用の設定（カメラアイコン・簡略化のレンダー列）か、キャッシュ</strong>のどちらかで、ほぼ決まっている。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big">結論：最有力は「エミッターをカメラアイコンで隠している」。</span>
+        <p>
+          パーティクルは<strong>エミッターオブジェクトの評価結果の一部</strong>。エミッター自体を最終レンダーから外すと、<strong>そこから出るパーティクルも一緒に消える</strong>。しかもレンダービューはその設定を無視する仕様なので、ビューポートでは正常に見えてしまい気づけない。
+        </p>
+        <p>
+          エミッターのメッシュだけを隠したいなら、カメラアイコンではなく<strong>パーティクルプロパティ &gt; レンダー &gt; 「エミッターを表示」をオフ</strong>。これが本来の専用スイッチ。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Principle</span>なぜ「レンダービューでは見える」のか</h2>
+        <p>
+          Blender の表示設定はビューポート用とレンダー用の2列に分かれていて、<strong>レンダービュー（ビューポートのレンダープレビュー）はビューポート側の列で評価される</strong>。<code>F12</code>
+          の最終レンダーだけがレンダー側の列を見る。
+        </p>
+        <figure>
+          <svg
+            viewBox="0 0 600 220"
+            role="img"
+            aria-label="表示設定はモニターアイコンのビューポート列とカメラアイコンのレンダー列に分かれ、レンダービューはビューポート列だけに従い、F12 の最終レンダーがレンダー列に従うことを示す図。レンダー列はレンダービューには効かない"
+          >
+            <g fill="none" stroke="currentColor" stroke-width="1" opacity="0.8">
+              <rect x="14" y="14" width="250" height="52" rx="6" />
+              <rect x="336" y="14" width="250" height="52" rx="6" />
+              <rect x="14" y="154" width="250" height="52" rx="6" />
+              <rect x="336" y="154" width="250" height="52" rx="6" />
+            </g>
+            <g fill="currentColor" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">
+              <text x="139" y="36" text-anchor="middle">モニターアイコン</text>
+              <text x="139" y="55" text-anchor="middle" opacity="0.75">＝ ビューポート列</text>
+              <text x="461" y="36" text-anchor="middle">カメラアイコン</text>
+              <text x="461" y="55" text-anchor="middle" opacity="0.75">＝ レンダー列</text>
+              <text x="139" y="178" text-anchor="middle">レンダービュー</text>
+              <text x="139" y="197" text-anchor="middle" opacity="0.75">（シェーディングのプレビュー）</text>
+              <text x="461" y="178" text-anchor="middle">F12 の最終レンダー</text>
+              <text x="461" y="197" text-anchor="middle" opacity="0.75">（書き出される画）</text>
+            </g>
+            <g stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.85">
+              <path d="M139 66 V148" />
+              <path d="M134 140 l5 8 5 -8" />
+              <path d="M461 66 V148" />
+              <path d="M456 140 l5 8 5 -8" />
+            </g>
+            <g stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.45" stroke-dasharray="5 5">
+              <path d="M380 66 L245 148" />
+            </g>
+            <g stroke="currentColor" stroke-width="1.8" opacity="0.8">
+              <path d="M305 98 l16 16 M321 98 l-16 16" />
+            </g>
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="12"
+              opacity="0.8"
+            >
+              <text x="300" y="138" text-anchor="middle">効かない</text>
+            </g>
+          </svg>
+          <figcaption>
+            レンダー列はレンダービューに効かない。だから「ビューポートでは見えるのに出ない」はレンダー列かキャッシュを疑う。
+          </figcaption>
+        </figure>
+        <blockquote class="manual">
+          <p>
+            <strong>Show in Renders</strong>:
+            <em
+              >“The object is able to be in the final render, note that it will still be visible in
+              rendered shading view.”</em
+            >
+          </p>
+          <p>
+            （最終レンダーに含めるかどうか。<strong>レンダーシェーディングビューには残り続けることに注意</strong>）
+          </p>
+        </blockquote>
+        <p>
+          この一文が症状の正体。あわせて<strong>隠したいものは専用のスイッチで隠す</strong>という原則を覚えておく。エミッターを隠したいなら「エミッターを表示」オフで、カメラアイコンではない。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Check</span>チェック順（この順番で見れば必ず見つかる）</h2>
+        <ol class="steps">
+          <li>
+            <strong>エミッターのカメラアイコン（レンダー）がオフになっていないか？</strong>
+            <p>
+              オンに戻し、代わりに パーティクルプロパティ &gt; レンダー &gt; 「エミッターを表示」をオフ。→ 原因1
+            </p>
+          </li>
+          <li>
+            <strong>モディファイアの「ParticleSystem」のカメラアイコンがオフでないか？</strong>
+            <p>→ 原因2</p>
+          </li>
+          <li>
+            <strong>パーティクルプロパティ &gt; レンダー &gt; レンダー方法</strong> が「なし」でないか？
+            <p>→ 原因3</p>
+          </li>
+          <li>
+            <strong>シーンプロパティ &gt; 簡略化 &gt; レンダー &gt; 子パーティクル</strong> が 0 でないか？
+            <p>→ 原因4</p>
+          </li>
+          <li>
+            <strong>発生のフレーム範囲／寿命の中をレンダリングしているか？</strong>
+            <p>→ 原因5</p>
+          </li>
+          <li>
+            途中フレームからの書き出し・ターミナルレンダリングなら <strong>物理プロパティ &gt; キャッシュ &gt; ベイク</strong> を実行。
+            <p>→ 原因5</p>
+          </li>
+          <li>
+            <strong>インスタンス元は「目アイコン」で隠しているか？</strong>
+            <p>モニターアイコンだとビューポートから消える。→ 原因6</p>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Causes</span>原因ごとの詳細</h2>
+
+        <h3><span class="tag">原因1</span>エミッターを「カメラアイコン」で隠している ← 最有力</h3>
+        <p>
+          パーティクルはエミッターオブジェクトの評価結果の一部なので、エミッターが最終レンダーから外れるとパーティクルも一緒に消える。発生元の板や球は消えるが、<strong>パーティクルも消える</strong>——そしてレンダービューでは両方見えたままになる。
+        </p>
+        <ul class="marks">
+          <li class="bad">
+            アウトライナーの <strong>カメラアイコン</strong> をオフ
+          </li>
+          <li class="bad">
+            オブジェクトプロパティ &gt; 可視性 &gt; 表示 &gt; <strong>レンダー</strong> のチェックを外す
+          </li>
+          <li class="good">
+            パーティクルプロパティ &gt; レンダー &gt; <strong>「エミッターを表示」をオフ</strong>
+          </li>
+        </ul>
+        <blockquote class="manual">
+          <p>
+            <strong>Show Emitter</strong>: <em>“When turned off, the emitter is not rendered.”</em>
+          </p>
+          <p>（オフにするとエミッターはレンダーされない）</p>
+        </blockquote>
+        <p>これなら<strong>エミッターのメッシュだけが消え、パーティクルは残る</strong>。</p>
+
+        <h3><span class="tag">原因2</span>パーティクルシステムモディファイアのカメラアイコンがオフ</h3>
+        <p>
+          パーティクルシステムはモディファイアプロパティに <code>ParticleSystem</code>
+          として並ぶ。そのヘッダーのアイコン列は、オブジェクトレベルと<strong>まったく同じ構造の罠</strong>になっている。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">アイコン</th>
+                <th scope="col">意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">モニター</th>
+                <td>ビューポートで表示（<strong>レンダービューもこれに従う</strong>）</td>
+              </tr>
+              <tr>
+                <th scope="row">カメラ</th>
+                <td>
+                  <strong>レンダーで表示</strong>。オフだとレンダービューには出るが <code>F12</code> で消える
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>オブジェクト側を直しても出ないなら、モディファイア側も確認する。</p>
+
+        <h3><span class="tag">原因3</span>レンダー方法が「なし（None）」になっている</h3>
+        <p>
+          <strong>パーティクルプロパティ &gt; レンダー &gt; レンダー方法</strong>
+          を確認。オブジェクト／コレクションをインスタンスするつもりで「なし」のまま、というのはよくある。
+        </p>
+        <blockquote class="manual">
+          <p>
+            <strong>None</strong>:
+            <em
+              >“Particles are not rendered, which is useful when particles only duplicate
+              objects.”</em
+            >
+          </p>
+          <p>（パーティクルはレンダーされない。パーティクルがオブジェクトを複製するだけの用途に便利）</p>
+        </blockquote>
+        <div class="note">
+          <p>
+            混同注意：<strong>ビューポート表示</strong>側の「なし」は意味が違う。<em
+              >“The particles are not shown in the 3D View and are not rendered.”</em
+            >
+            ＝ <strong>両方消える</strong>。
+          </p>
+        </div>
+
+        <h3><span class="tag">原因4</span>簡略化（Simplify）の「レンダー」列で子パーティクルが絞られている</h3>
+        <p><strong>シーンプロパティ &gt; 簡略化 &gt; レンダー &gt; 子パーティクル</strong>。</p>
+        <blockquote class="manual">
+          <p>
+            <strong>Child Particles</strong>:
+            <em>“Show only a subset of all child hairs and particles.”</em>
+          </p>
+          <p>（子ヘア／子パーティクルの一部だけを表示する）</p>
+        </blockquote>
+        <ul class="ticks">
+          <li><strong>0 にするとヘアや子パーティクルがレンダーから消える</strong></li>
+          <li>
+            「レンダー」列は <code>F12</code> だけに効く（レンダービューは「ビューポート」列を見る） →
+            「レンダービューでは見えるのに出ない」と完全に一致する
+          </li>
+          <li>簡略化パネル自体のチェックがオンになっていないかも確認</li>
+        </ul>
+
+        <h3><span class="tag">原因5</span>キャッシュ／フレーム範囲（パーティクルは時間方向のシミュレーション）</h3>
+        <blockquote class="manual">
+          <p>シミュレーションは <strong>Start と End の間の正のフレームでのみ計算される</strong>。</p>
+          <p>
+            ベイクを推奨：再シミュレーションを避け、グリッチを防ぎ、<strong>結果が毎回まったく同じになることを保証できる</strong>。
+          </p>
+        </blockquote>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">症状が出る典型パターン</th>
+                <th scope="col">なぜ出ないか</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">途中フレームからアニメーションを書き出した（例：100〜200）</th>
+                <td>1〜99 が未計算なのでパーティクルが発生していない</td>
+              </tr>
+              <tr>
+                <th scope="row">ファイルを開き直した／別マシンでレンダリング</th>
+                <td>メモリ上のキャッシュが消えている</td>
+              </tr>
+              <tr>
+                <th scope="row">ターミナル（バックグラウンド）からレンダリング</th>
+                <td>GUI 再生がないのでキャッシュが作られない → <strong>ベイクが事実上必須</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          対策は <strong>物理プロパティ &gt; キャッシュ &gt; ベイク</strong> を実行してからレンダリングすること。
+        </p>
+        <p>あわせて次も確認する。</p>
+        <ul class="ticks">
+          <li>
+            <strong>発生（Emission）&gt; フレーム開始 / 終了</strong> と <strong>寿命（Lifetime）</strong> —
+            その範囲外のフレームをレンダリングしていないか
+          </li>
+          <li>
+            <strong>レンダー &gt; エクストラ</strong> の <strong>未誕生（Unborn）/ 死亡（Dead）</strong>
+            のチェック — 誕生前・死亡後のパーティクルを出す／出さないの設定
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Not it</span>原因6：これは原因では「ない」（インスタンス元の隠し方）</h2>
+        <p>
+          オブジェクト／コレクションをインスタンスしている場合、<strong>インスタンス元</strong>の隠し方は挙動が逆になる。
+        </p>
+        <blockquote class="manual">
+          <p>
+            blender#81973（2.91 時点）:
+            <em
+              >“When the instance object of a particle system is disabled in the viewport the
+              particles are also disabled in the viewport. However when the instance object is
+              disabled in render they still appear in the render.”</em
+            >
+          </p>
+          <p>
+            （インスタンス元を<strong>ビューポートで無効</strong>にするとビューポートのパーティクルも消える。しかし<strong>レンダーで無効</strong>にしてもパーティクルはレンダーに出る）
+          </p>
+        </blockquote>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">インスタンス元の隠し方</th>
+                <th scope="col">パーティクルへの影響</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">カメラアイコン（レンダーで無効）</th>
+                <td><strong>レンダーには出る</strong> ＝ 今回の原因ではない</td>
+              </tr>
+              <tr>
+                <th scope="row">モニターアイコン（ビューポートで無効）</th>
+                <td><strong>ビューポートからパーティクルも消える</strong>（逆の症状）</td>
+              </tr>
+              <tr>
+                <th scope="row">目アイコン</th>
+                <td>影響しない ＝ <strong>安全</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <blockquote class="manual">
+          <p>
+            開発者スレッドでの推奨:
+            <em>“Use that Eye button instead of the Screen button to hide Sphere and everything will be fine.”</em>
+          </p>
+          <p>（モニターアイコンではなく<strong>目アイコン</strong>で隠せば問題ない）</p>
+        </blockquote>
+        <div class="note">
+          <p>
+            2.91 時点の報告でステータスは Confirmed（「ビューポートとレンダーの挙動は一致させるべき」と議論中）なので、バージョンによって変わる可能性がある。<strong>目アイコン運用なら影響を受けない。</strong>
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Opposite</span>逆のケース（間違いやすい）</h2>
+        <p>
+          <strong>ビューポート表示 &gt; 量（Amount）</strong> は<strong>ビューポートだけ</strong>を減らす設定。
+        </p>
+        <blockquote class="manual">
+          <p>
+            <em
+              >“Specifies the percentage of all particles to show in the viewport (all particles are
+              still rendered).”</em
+            >
+          </p>
+          <p>（ビューポートに表示する割合。<strong>レンダーでは全パーティクルが出る</strong>）</p>
+        </blockquote>
+        <p>
+          これは「<strong>ビューポートでは少ないのにレンダーで大量に出る</strong>」側の原因。今回とは逆なので、ここをいじっても症状は直らない。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li>
+            <strong>物理演算がレンダリングに出ない</strong> — 剛体・流体・クロスなど物理全般の同系統の問題
+          </li>
+          <li>
+            <strong>レンダリングでワールドの照明が効かない</strong> — 同じ「ビューポートでは見えるのに」系
+          </li>
+          <li><strong>流体シミュレーションで液体が出ない</strong> — ベイク忘れの代表例</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
