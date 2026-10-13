@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20261014-da1a",
+  "title": "ビデオ編集（VSE）でリタイミングが見つからない",
+  "summary": "リタイミングは「ストリップ > リタイミング」に全部入っていて、見つからないのはリタイミングキーが既定で非表示なだけ。Ctrl+R で表示をオンにすればキーが出る（速度だけなら R で数値入力）。",
+  "mainLabel": "Blender/ビデオ編集",
+  "subLabels": [
+    "Blender/Q&A"
+  ],
+  "createdAt": "2026-10-14",
+  "updatedAt": "2026-10-14",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A/Q&A_ビデオ編集のリタイミングが見つからない.md",
+    "note": "docs/Q&A/Q&A_ビデオ編集のリタイミングが見つからない.md を夜間取り込みでページ化したもの"
+  }
+}
