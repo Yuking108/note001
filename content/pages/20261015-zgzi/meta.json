@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "20261015-zgzi",
+  "title": "トーラスに巻きつくコイル（トロイダルコイル）を作る",
+  "summary": "トーラス本体は加工せず、主半径 R の円カーブをレールにしてスクリューで作ったバネを沿わせるのが基本。作り方は3通り（スクリュー+カーブモディファイア／アドオン Extra Curve Objects の Spirals>Torus／パラメトリック方程式の Python スクリプト）で、巻き半径は「副半径 r + ワイヤー半径」にすると表面に密着する。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/アドオン",
+    "Blender/高度な設定"
+  ],
+  "createdAt": "2026-10-15",
+  "updatedAt": "2026-10-15",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_トーラスに巻きつくコイルを作る.md",
+    "note": "docs/テクニック/TIPS_トーラスに巻きつくコイルを作る.md を夜間取り込みでページ化したもの"
+  }
+}

@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>トーラスに巻きつくコイル（トロイダルコイル）を作る</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が多い／セルが長い表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td .ui {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.88em;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+      /* 図のキー（丸）。塗りは背景色で抜いて線だけ見せる */
+      svg .key {
+        fill: var(--bg);
+        stroke: currentColor;
+        stroke-width: 2;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+      ol.steps > li pre {
+        margin: 0.5rem 0 0;
+      }
+      ol.steps > li .scroll-x {
+        margin: 0.7rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.ticks > li {
+        position: relative;
+        padding-left: 1.1rem;
+        margin-bottom: 0.9rem;
+        line-height: 1.75;
+      }
+      ul.ticks > li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+      ul.ticks > li p {
+        margin: 0.2rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      /* ✕ / ○ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      dl.defs {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+      }
+      dl.defs dt {
+        font-weight: 700;
+        margin-top: 1rem;
+      }
+      dl.defs dt:first-child {
+        margin-top: 0;
+      }
+      dl.defs dd {
+        margin: 0.2rem 0 0;
+        color: var(--fg-muted);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>トーラスに巻きつくコイル（トロイダルコイル）を作る</h1>
+        <p class="standfirst">
+          ドーナツ（トーラス）の輪に沿って、チューブの周りをぐるぐる巻いたコイル——実物でいう<strong>トロイダルコイル</strong>（環状インダクタ）の形を作る。作り方は3通りあり、目的で選ぶ。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >トーラスのメッシュは<strong>一切いじらない</strong>。トーラスの芯を通る円（＝中心円、半径 R）を<strong>レール</strong>として別に作り、そこへ別に作ったバネを沿わせる。</span
+        >
+        <p>
+          数値で正確に作りたいなら<strong>方法C（Python スクリプト）</strong>が最も確実。アドオンが入るなら<strong>方法B</strong>が最速。アドオンなしで後から巻き数を調整したいときだけ<strong>方法A</strong>。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Pick</span>どの方法を使うか</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">方法</th>
+                <th scope="col">向いているケース</th>
+                <th scope="col">難易度</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">A. スクリュー + カーブ変形</th>
+                <td>アドオンなしでやりたい／後から巻き数を調整したい</td>
+                <td>★★☆</td>
+              </tr>
+              <tr>
+                <th scope="row">B. アドオン「Extra Curve Objects」</th>
+                <td>とにかく早く作りたい</td>
+                <td>★☆☆</td>
+              </tr>
+              <tr>
+                <th scope="row">C. Python スクリプト</th>
+                <td>数値で正確に作りたい／何度も作る</td>
+                <td>★☆☆</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Model</span>前提：トーラスそのものには巻きつけられない</h2>
+        <p>
+          トーラスのメッシュを加工してコイルにするのではない。トーラスは「巻きつける相手」として置いておくだけで、<strong>一切いじらない</strong>（最後は隠してもいい）。トーラスの寸法から読むのは
+          <strong>R（主半径）</strong>と <strong>r（副半径）</strong>の2つだけ。
+        </p>
+        <dl class="defs">
+          <dt>レールの半径 ＝ 主半径 R</dt>
+          <dd>チューブの外側ではなく<strong>芯</strong>。ワールド原点からチューブの芯までの距離</dd>
+          <dt>コイルの巻き半径 ＝ 副半径 r ＋ ワイヤーの半径</dt>
+          <dd>こうするとトーラスの表面にちょうど乗る（例：<code>0.25 + 0.02 = 0.27</code>）</dd>
+        </dl>
+        <figure>
+          <svg
+            viewBox="0 0 600 250"
+            role="img"
+            aria-label="トーラスを横から見た断面の図。左端の縦線がワールド原点を通る回転軸で、そこから右に主半径 R だけ離れた位置にチューブの断面（円）がある。チューブ断面の中心に × 印があり、これが中心円の通る位置、つまりコイルのレールが通るところ。チューブ断面の半径が副半径 r で、コイルの巻き半径はこれにワイヤーの半径を足した少し大きい円になる"
+          >
+            <g stroke="currentColor" stroke-width="1" opacity="0.5">
+              <path d="M60 25 V215" fill="none" stroke-dasharray="6 5" />
+              <path d="M60 120 H560" fill="none" stroke-dasharray="4 6" opacity="0.6" />
+            </g>
+            <circle
+              cx="400"
+              cy="120"
+              r="56"
+              fill="currentColor"
+              fill-opacity="0.09"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+            <circle
+              cx="400"
+              cy="120"
+              r="68"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-dasharray="5 5"
+              opacity="0.7"
+            />
+            <g stroke="currentColor" stroke-width="2" opacity="0.9">
+              <path d="M393 113 L407 127" fill="none" />
+              <path d="M407 113 L393 127" fill="none" />
+            </g>
+            <g stroke="currentColor" stroke-width="1" opacity="0.8">
+              <path d="M60 200 H400" fill="none" />
+              <path d="M60 194 V206" fill="none" />
+              <path d="M400 194 V206" fill="none" />
+              <path d="M400 120 H456" fill="none" />
+              <path d="M456 114 V126" fill="none" />
+            </g>
+            <g fill="currentColor" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">
+              <text x="200" y="193" opacity="0.85">主半径 R（原点 → チューブの芯）</text>
+              <text x="412" y="110" font-size="11" opacity="0.85">副半径 r</text>
+              <text x="478" y="124" font-size="11" opacity="0.85">チューブ（トーラスの肉）</text>
+              <text x="400" y="34" text-anchor="middle" font-size="11" opacity="0.85">
+                巻き半径 = r + ワイヤー半径
+              </text>
+              <text x="248" y="146" font-size="11" opacity="0.85">× = 中心円＝レールの通る位置</text>
+              <text x="66" y="222" font-size="11" opacity="0.75">ワールド原点（回転軸）</text>
+            </g>
+          </svg>
+          <figcaption>
+            横から見たトーラスの断面。レールは外周ではなくチューブの芯（×）を通る。破線の円がコイルの巻き半径で、内側の実線がトーラスの表面。
+          </figcaption>
+        </figure>
+        <p>やることの流れは、どの方法でも同じ。</p>
+        <ul class="ticks">
+          <li>トーラスの寸法から <strong>R</strong> と <strong>r</strong> を読む（加工はしない）</li>
+          <li><strong>半径 R の円カーブ</strong>をレールとして置く（＝ドーナツの芯を通る輪）</li>
+          <li>
+            <strong>断面の円 ＋ スクリュー</strong>でまっすぐなバネを作り、カーブモディファイアでレールに沿わせる
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Step 0</span>今あるトーラスの R と r を調べる</h2>
+        <h3>いちばん確実：作り直す</h3>
+        <p>
+          <code>Shift+A &gt; メッシュ &gt; トーラス</code> →
+          <code>F9</code>（redoパネル）で <strong>主半径 = 1 / 副半径 = 0.25</strong>
+          のように自分で数値を入れる。以降の計算で迷わない。<strong>おすすめはこれ。</strong>
+        </p>
+        <h3>既にあるトーラスから逆算する</h3>
+        <p>
+          トーラスを選択して <code>N</code>（サイドバー）<strong>&gt; 寸法（Dimensions）</strong>を見る。
+        </p>
+        <pre><code>X = Y = 2 × (R + r)
+Z     = 2 × r
+
+r（副半径） = Z ÷ 2
+R（主半径） = X ÷ 2 − r</code></pre>
+        <p>デフォルトのトーラスなら <code>X = Y = 2.5 / Z = 0.5</code> なので、</p>
+        <pre><code>r = 0.5 ÷ 2       = 0.25
+R = 2.5 ÷ 2 − 0.25 = 1.0</code></pre>
+        <div class="note">
+          <p>
+            オブジェクトモードでスケールをかけている場合は、先に
+            <strong><code>Ctrl+A &gt; スケール</code></strong> で適用してから寸法を読むこと。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Method A</span>スクリュー + カーブモディファイア</h2>
+        <p>考え方は<strong>まっすぐなバネを作り、それを円に沿わせて曲げる</strong>。</p>
+        <ol class="steps">
+          <li>
+            <strong>ワイヤーの断面を作る</strong>
+            <pre><code>Shift+A &gt; メッシュ &gt; 円
+F9 で   頂点 = 12 / 半径 = 0.02   ← ワイヤーの太さ</code></pre>
+            <p>
+              編集モードに入り（<code>Tab</code>）、<code>A</code> で全選択してから下の2操作。終わったら
+              <code>Tab</code> でオブジェクトモードに戻る。
+            </p>
+            <pre><code>R X 90 Enter      ← 円を立てる（XZ平面に向ける）
+G X 0.27 Enter    ← 巻き半径ぶん横にずらす（副半径0.25 + ワイヤー半径0.02）</code></pre>
+          </li>
+          <li>
+            <strong>スクリューモディファイアでバネにする</strong>
+            <p>モディファイアプロパティ &gt; 追加 &gt; 生成 &gt; <strong>スクリュー</strong>。</p>
+            <div class="scroll-x">
+              <table class="wide">
+                <thead>
+                  <tr>
+                    <th scope="col">項目</th>
+                    <th scope="col">設定値</th>
+                    <th scope="col">公式の説明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">軸</th>
+                    <td><strong>Z</strong></td>
+                    <td>らせんを作る方向</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">角度</th>
+                    <td>360°</td>
+                    <td>1回転の角度</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">スクリュー</th>
+                    <td><strong><code>0.1047</code></strong></td>
+                    <td>らせん1回分の高さ（＝ピッチ。<code>6.283 ÷ 60巻き</code>）</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">反復（Iterations）</th>
+                    <td><strong>60</strong></td>
+                    <td>らせんの回転数（＝巻き数）</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">ステップ</th>
+                    <td>16〜24</td>
+                    <td>1回転の分割数（ビューポート）</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">レンダーステップ</th>
+                    <td>24〜32</td>
+                    <td>レンダー時の分割数</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </li>
+          <li>
+            <strong>沿わせる円カーブを作る</strong>
+            <pre><code>Shift+A &gt; カーブ &gt; 円
+F9 で   半径 = 1     ← トーラスの主半径と同じ</code></pre>
+            <p>位置はトーラスと同じ（両方ワールド原点）にしておく。</p>
+          </li>
+          <li>
+            <strong>カーブモディファイアで曲げる</strong>
+            <p>
+              コイルのメッシュを選択 → モディファイア &gt; 追加 &gt; 変形 &gt;
+              <strong>カーブ</strong>。<strong>カーブオブジェクト</strong>に手順3の円、<strong>変形軸</strong>は
+              <strong>Z</strong>（コイルがZ方向に伸びているため）。
+            </p>
+          </li>
+        </ol>
+        <div class="note">
+          <p>
+            <strong>スクリュー × 反復 ＝ コイルの全長</strong>になる。ここでは
+            <code>0.1047 × 60 ≒ 6.283</code> で、<strong>中心円の円周とぴったり一致</strong>させている。<strong>これが肝。</strong>
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Method B</span>アドオン「Extra Curve Objects」（最速）</h2>
+        <p>
+          このアドオンのスパイラルには <strong>Archimedean / Logarithmic / Spherical / Torus</strong>
+          の4種類があり、<strong>「Torus」がそのままトーラス状のらせん</strong>を生成してくれる。
+        </p>
+        <h3>インストール（4.2 以降は拡張機能プラットフォームに移動している）</h3>
+        <ul class="ticks">
+          <li>
+            <strong>Blender 4.1 まで</strong> — プリファレンス &gt; アドオン で
+            <code>Add Curve: Extra Objects</code> を有効化するだけ
+          </li>
+          <li>
+            <strong>Blender 4.2 LTS 以降（5.2 も含む）</strong> — バンドルされていないので、プリファレンス
+            &gt; <strong>拡張機能（Get Extensions）</strong>で
+            <strong>「Extra Curve Objects」</strong>を検索してインストール
+            <p>
+              または zip をダウンロードして「ディスクからインストール」／Blender にドラッグ＆ドロップ。
+            </p>
+          </li>
+        </ul>
+        <h3>使い方</h3>
+        <ol class="steps">
+          <li>
+            <strong>らせんを出す</strong>
+            <pre><code>Shift+A &gt; カーブ &gt; Extra Objects &gt; Spirals &gt; Torus</code></pre>
+            <p><code>F9</code>（redoパネル）で巻き数・半径・分割数を調整。</p>
+          </li>
+          <li>
+            <strong>太さを付ける</strong>
+            <p>
+              カーブのままでは線なので、<strong>カーブデータプロパティ &gt; ジオメトリ &gt; ベベル</strong>で太さを与える。
+            </p>
+            <pre><code>形状 = 丸
+深度 = 0.02        ← ワイヤーの太さ
+解像度 = 4</code></pre>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Method C</span>Python スクリプトで数式から作る（最も正確）</h2>
+        <p>
+          トーラス上のらせんは数式で厳密に書ける。<strong>スクリプトタブに貼って実行するだけ。</strong>
+        </p>
+        <h3>パラメトリック方程式</h3>
+        <pre><code>x = (R + r·cos(Nθ)) · cos θ
+y = (R + r·cos(Nθ)) · sin θ
+z =  r·sin(Nθ)
+
+θ : 0 → 2π
+R : トーラスの主半径
+r : 巻きの半径
+N : 巻き数（整数にすると端がぴったり閉じる）</code></pre>
+        <p>
+          この式の点は<strong>必ずトーラス中心円から距離 r の位置</strong>に来る（＝トーラス表面にぴったり乗る）ので、浮いたり埋まったりしない。
+        </p>
+        <h3>スクリプト</h3>
+        <pre><code>import bpy, math
+
+# ===== パラメータ =====
+R         = 1.0    # トーラスの主半径
+r         = 0.27   # 巻きの半径（副半径0.25 + ワイヤー半径0.02）
+N         = 60     # 巻き数（整数にすること）
+steps     = 24     # 1巻きあたりの分割数
+thickness = 0.02   # ワイヤーの太さ
+name      = "ToroidalCoil"
+# =====================
+
+total = N * steps
+pts = []
+for i in range(total):
+    t = 2 * math.pi * i / total
+    a = N * t
+    x = (R + r * math.cos(a)) * math.cos(t)
+    y = (R + r * math.cos(a)) * math.sin(t)
+    z = r * math.sin(a)
+    pts.append((x, y, z))
+
+cu = bpy.data.curves.new(name, 'CURVE')
+cu.dimensions = '3D'
+cu.bevel_depth = thickness
+cu.bevel_resolution = 4
+cu.use_fill_caps = True
+
+sp = cu.splines.new('POLY')
+sp.points.add(len(pts) - 1)
+for i, (x, y, z) in enumerate(pts):
+    sp.points[i].co = (x, y, z, 1.0)
+sp.use_cyclic_u = True
+
+ob = bpy.data.objects.new(name, cu)
+bpy.context.collection.objects.link(ob)
+bpy.context.view_layer.objects.active = ob
+ob.select_set(True)
+print("done:", total, "points")</code></pre>
+        <h3>実行手順</h3>
+        <ol class="steps">
+          <li>上部の <strong>Scripting</strong> タブを開く</li>
+          <li>「新規」でテキストを作成し、上記を貼り付け</li>
+          <li>
+            パラメータ（<code>R</code> / <code>r</code> / <code>N</code> /
+            <code>thickness</code>）を自分のトーラスに合わせる
+          </li>
+          <li>▶ 実行（<code>Alt+P</code>）</li>
+        </ol>
+        <p>
+          メッシュにしたい場合は、生成後に <strong>オブジェクト &gt; 変換 &gt; メッシュ</strong>。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Gotchas</span>つまずきやすい点</h2>
+        <ul class="marks">
+          <li class="bad">
+            <strong>全長が円周とずれていると、巻きの端どうしが繋がらない。</strong>
+            <p>
+              方法Aなら「スクリュー」の値か「反復」を微調整して合わせる。方法Cなら <code>N</code> を整数にする。
+            </p>
+          </li>
+          <li class="bad">
+            <strong>スケールをかけたトーラスの寸法をそのまま読んでしまう。</strong>
+            <p><code>Ctrl+A &gt; スケール</code> で適用してから読む。</p>
+          </li>
+          <li class="bad">
+            <strong>原点の位置を気にせずカーブモディファイアを付ける。</strong>
+            <p>カーブ変形はグローバル空間で効くので、原点がずれると結果もずれる（下の引用）。</p>
+          </li>
+          <li class="good">
+            <strong>内側が詰まって見えるのは正常。</strong>
+            <p>
+              輪の内周は外周より短いので、均一に巻くと内側ほど巻きが密集する。<strong>実物のトロイダルコイルもまったく同じ見た目</strong>になるので、これは不具合ではない。
+            </p>
+          </li>
+        </ul>
+        <h3>位置合わせの注意（公式マニュアルより）</h3>
+        <blockquote class="manual">
+          <p>
+            カーブモディファイアは<strong>グローバル空間で動作する</strong>ので、ジオメトリとカーブの位置関係が結果を決める。<strong>オブジェクトの原点をジオメトリの中心に</strong>置き（「原点をジオメトリへ」）、<strong>オブジェクトの原点をカーブオブジェクトの原点と同じ位置から始める</strong>とよい。
+          </p>
+          <p>
+            <strong>カーブの端を超えた部分は、その端の方向のまま変形が続く。</strong>
+          </p>
+        </blockquote>
+        <p>
+          後者がまさに、方法Aで<strong>全長を円周に合わせる</strong>必要がある理由。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Tuning</span>調整のコツ</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">巻きを細かくする</th>
+                <td>
+                  <code>N</code>（巻き数）を増やす。方法Aなら「反復」を増やし、「スクリュー」を
+                  <code>6.283 ÷ 反復</code> に合わせる
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">ワイヤーを太くする</th>
+                <td>断面円の半径／ベベル深度／<code>thickness</code> を上げる</td>
+              </tr>
+              <tr>
+                <th scope="row">トーラスに密着させる</th>
+                <td>
+                  <code>r</code> ＝ <strong>副半径 + ワイヤー半径</strong> にする（<code>0.25 + 0.02 = 0.27</code>）
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">巻きを浮かせる</th>
+                <td><code>r</code> をもう少し大きく</td>
+              </tr>
+              <tr>
+                <th scope="row">コイルだけ見せる</th>
+                <td>
+                  トーラス本体を<strong>目アイコン</strong>で隠す（カメラアイコンで隠してもレンダーに影響しない点は別ノート参照）
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li>
+            <strong>長円（両端が半円の楕円）の作り方</strong> — ミラー＋クリッピングの応用
+          </li>
+          <li>
+            <strong>オブジェクトの原点（オレンジの点）</strong> — カーブ変形は原点の位置が効くので重要
+          </li>
+          <li>
+            <strong>パーティクルがレンダリングに出ない</strong> — 元オブジェクトの隠し方の注意
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
