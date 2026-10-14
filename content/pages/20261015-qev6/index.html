@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>面にガビガビのノイズが出る（Zファイティング）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が多い／セルが長い表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+      ol.steps > li pre {
+        margin: 0.5rem 0 0;
+      }
+      ol.steps > li .scroll-x {
+        margin: 0.7rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.ticks > li {
+        position: relative;
+        padding-left: 1.1rem;
+        margin-bottom: 0.9rem;
+        line-height: 1.75;
+      }
+      ul.ticks > li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+      ul.ticks > li p {
+        margin: 0.2rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      /* ✕ / ○ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      dl.defs {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+      }
+      dl.defs dt {
+        font-weight: 700;
+        margin-top: 1rem;
+      }
+      dl.defs dt:first-child {
+        margin-top: 0;
+      }
+      dl.defs dd {
+        margin: 0.2rem 0 0;
+        color: var(--fg-muted);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>面にガビガビのノイズが出る（Zファイティング）</h1>
+        <p class="standfirst">
+          モデリング中、面の上に市松模様や縞模様が出てチラつく。<strong>スケールの適用（<code>Ctrl+A</code>）では直らない。</strong>メッシュの構造か、ビューの設定の問題だから。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >これは<strong>Zファイティング</strong>。同じ場所に2つの面が重なっていて、どちらを手前に描くか
+          GPU が決められない状態。その結果が市松模様・縞模様・チラつきとして見えている。</span
+        >
+        <p>
+          <strong>大半は「メッシュが二重になっている」。</strong>まず編集モードで
+          <code>A</code> → <code>M</code> → 距離で結合を試す。それで直らなければ、ビューのクリッピング範囲を疑う。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Check</span>そもそもZファイティングか見分ける</h2>
+        <p><strong>視点を少し動かしてみる。</strong></p>
+        <ul class="marks">
+          <li class="bad">
+            模様が<strong>這うように変化する／チラつく</strong> → ほぼ確実にZファイティング
+          </li>
+          <li class="good">視点を動かしても模様が面に貼り付いたまま動かない → 別の原因</li>
+        </ul>
+        <figure>
+          <svg
+            viewBox="0 0 600 190"
+            role="img"
+            aria-label="2枚の面の断面を横から見た図。左側は2枚の面が完全に同じ平面上に重なっており、どちらが手前か決まらないため縞模様が出る。右側は上の面を 0.001 メートルだけ法線方向に浮かせてあり、前後関係が確定するので模様が出ない"
+          >
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="12"
+              opacity="0.85"
+            >
+              <text x="20" y="24">✕ 完全に同一平面</text>
+              <text x="330" y="24">○ 0.001 m 浮かせる</text>
+              <text x="20" y="168" font-size="11" opacity="0.8">
+                前後が決まらない → 縞・市松・チラつき
+              </text>
+              <text x="330" y="168" font-size="11" opacity="0.8">前後が確定 → きれいに出る</text>
+            </g>
+            <!-- 左：重なった2枚 -->
+            <path d="M30 100 H260" fill="none" stroke="currentColor" stroke-width="3" />
+            <path
+              d="M30 100 H260"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-dasharray="10 10"
+              opacity="0.55"
+            />
+            <g stroke="currentColor" stroke-width="1" opacity="0.7">
+              <path d="M145 100 V62" fill="none" />
+            </g>
+            <text
+              x="150"
+              y="58"
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="11"
+              opacity="0.8"
+            >
+              2枚が同じ高さ
+            </text>
+            <!-- 右：わずかに離した2枚 -->
+            <path d="M340 104 H570" fill="none" stroke="currentColor" stroke-width="3" />
+            <path
+              d="M340 88 H570"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-dasharray="10 10"
+              opacity="0.55"
+            />
+            <g stroke="currentColor" stroke-width="1" opacity="0.7">
+              <path d="M455 88 V72" fill="none" />
+              <path d="M449 88 H461" fill="none" />
+              <path d="M449 104 H461" fill="none" />
+              <path d="M455 104 V120" fill="none" />
+            </g>
+            <text
+              x="465"
+              y="70"
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="11"
+              opacity="0.8"
+            >
+              わずかな隙間
+            </text>
+          </svg>
+          <figcaption>
+            2枚の面を横から見た断面。完全に同じ平面にある限り、Zファイティングは原理的に避けられない。
+          </figcaption>
+        </figure>
+        <p>原因は大きく2系統。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">系統</th>
+                <th scope="col">原因</th>
+                <th scope="col">直し方</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">A. メッシュ側</th>
+                <td>面が二重になっている／内部に余計な面がある</td>
+                <td>重複を削除する ← <strong>大半はこれ</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">B. ビュー側</th>
+                <td>クリッピング範囲が広すぎて深度の精度が足りない</td>
+                <td>範囲の開始／終了を調整</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Cause A</span>メッシュが二重になっている（最有力）</h2>
+        <h3>よくある発生原因</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">何が起きるか</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><code>E</code>（押し出し）してすぐ右クリック／<code>Esc</code></th>
+                <td>
+                  <strong>移動はキャンセルされるが、面は複製されたまま</strong>元の位置に残る ←
+                  <strong>断トツで多い</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row"><code>Shift+D</code>（複製）して右クリック</th>
+                <td>同じ位置にまるごと複製が残る</td>
+              </tr>
+              <tr>
+                <th scope="row">ミラーモディファイアでクリッピングなし、中央が重なっている</th>
+                <td>中央で両側の面が重複</td>
+              </tr>
+              <tr>
+                <th scope="row">ソリッド化モディファイアの厚み = 0</th>
+                <td>表と裏が同じ位置に</td>
+              </tr>
+              <tr>
+                <th scope="row">配列モディファイアのオフセット = 0</th>
+                <td>コピーが全部同じ位置に積み重なる</td>
+              </tr>
+              <tr>
+                <th scope="row">ブーリアンの切断面が元の面とぴったり同一平面</th>
+                <td>2枚が同じ平面に乗る</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>診断1：重複頂点を結合してみる</h3>
+        <p>編集モードで：</p>
+        <pre><code>A        ← 全選択
+M        ← マージメニュー
+&gt; 距離で結合</code></pre>
+        <blockquote class="manual">
+          <p>
+            公式マニュアル：<strong>Merge by Distance</strong> =
+            「一定距離より近い頂点のクラスタをそれぞれ結合する」
+          </p>
+          <p>
+            オプション <strong>結合距離（Merge Distance）</strong> = 「この距離より近い頂点が結合される」
+          </p>
+        </blockquote>
+        <p>
+          実行後、<strong>左下に「Removed N vertices」と出たらビンゴ</strong>。それが原因だった。<code>0</code>
+          なら重複頂点は無い（＝面だけが重なっているか、系統Bの可能性）。
+        </p>
+
+        <h3>診断2：内部の面を探す</h3>
+        <pre><code>選択 &gt; すべてを選択（特徴） &gt; 内側の面</code></pre>
+        <blockquote class="manual">
+          <p>
+            公式マニュアル：<strong>Interior Faces</strong> =
+            「メッシュの表面ではなく、誤って内部に作られてしまった可能性のある面を選択する」（1つの辺を複数の面が共有しているような、異常な隣接を持つ面を見つける）
+          </p>
+        </blockquote>
+        <p>何か選択されたら、<code>X &gt; 面</code> で削除する。</p>
+
+        <h3>診断3：面数を数える</h3>
+        <pre><code>オーバーレイ（右上のプルダウン）&gt; 統計</code></pre>
+        <p>ただの直方体なら <strong>面は6枚</strong>のはず。倍になっていたら二重。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Cause B</span>クリッピング範囲が広すぎる</h2>
+        <p>
+          <code>N</code>（サイドバー）&gt; <strong>ビュー</strong> タブ &gt;
+          <strong>範囲の開始 / 終了（Clip Start / End）</strong>。
+        </p>
+        <blockquote class="manual">
+          <p>
+            公式マニュアルの警告：「広いクリッピング範囲は近くと遠くの両方を見られるようにするが、<strong>深度の精度が落ち、アーティファクトが発生する</strong>」
+          </p>
+          <p>
+            「非常に広い範囲では、深度バッファに依存する処理が不安定になることがある（グラフィックカードとドライバによる）」
+          </p>
+        </blockquote>
+        <h3>直し方（公式の推奨）</h3>
+        <ul class="ticks">
+          <li>大きなシーンでは<strong>開始（近クリップ）の値を上げる</strong></li>
+          <li><strong>遠くから見ないオブジェクトでは終了（遠クリップ）を下げる</strong></li>
+          <li>
+            平行投影（透視投影オフ）では<strong>終了の値だけが効く</strong>ので、極端に大きい値はやはりアーティファクトを生む
+          </li>
+        </ul>
+        <p>今回のように<strong>10cm程度の小さいオブジェクト</strong>を扱っているなら：</p>
+        <pre><code>範囲の開始 = 0.001 〜 0.01 m
+範囲の終了 = 10 〜 100 m     ← 既定の 1000 m から下げるのが効く</code></pre>
+        <div class="note">
+          <p>
+            これは Blender 固有の問題ではなく、<strong>OpenGL / DirectX のアプリ全般に共通する制限</strong>。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Workaround</span>どうしても面を同一平面に置きたい場合</h2>
+        <p>
+          デカールやシールのように<strong>わざと面を重ねる</strong>必要があるときは、<strong>ほんの少しだけ浮かせる</strong>。
+        </p>
+        <pre><code>0.0005 〜 0.001 m ほど法線方向にオフセットする</code></pre>
+        <p>完全に同じ平面にある限り、Zファイティングは原理的に避けられない。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Order</span>チェック順まとめ</h2>
+        <ol class="steps">
+          <li>
+            <strong>視点を動かして模様が這うか確認</strong>
+            <p>這う／チラつくならZファイティング確定。</p>
+          </li>
+          <li>
+            <strong>編集モード &gt; <code>A</code> &gt; <code>M</code> &gt; 距離で結合</strong>
+            <p>「Removed N vertices」が出たら解決（系統A）。</p>
+          </li>
+          <li>
+            <strong>選択 &gt; すべてを選択（特徴）&gt; 内側の面 → <code>X</code> &gt; 面</strong>
+            <p>系統A。</p>
+          </li>
+          <li>
+            <strong>モディファイアを確認</strong>
+            <p>ミラーのクリッピング／ソリッド化の厚み0／配列のオフセット0（系統A）。</p>
+          </li>
+          <li>
+            <strong><code>N</code> &gt; ビュー &gt; 範囲の終了 を 1000 → 100 に下げる</strong>
+            <p>系統B。</p>
+          </li>
+          <li>
+            <strong>わざと重ねている面なら 0.001 m 浮かせる</strong>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li><strong>シェーディングの種類と自動スムーズシェード</strong></li>
+          <li>
+            <strong>ブーリアンモディファイア</strong>
+            <p>同一平面の切断面はZファイティングを生みやすい。</p>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
