@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>曲がった角・板・反り屋根を作る（シンプル変形＋プロポーショナル編集）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が多い／セルが長い表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td .ui {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.88em;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+      ol.steps > li pre {
+        margin: 0.5rem 0 0;
+      }
+      ol.steps > li .scroll-x {
+        margin: 0.7rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.ticks > li {
+        position: relative;
+        padding-left: 1.1rem;
+        margin-bottom: 0.9rem;
+        line-height: 1.75;
+      }
+      ul.ticks > li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+      ul.ticks > li p {
+        margin: 0.2rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      /* ✕ / ○ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>曲がった角・板・反り屋根を作る（シンプル変形＋プロポーショナル編集）</h1>
+        <p class="standfirst">
+          シンプル変形モディファイアの<strong>ベンド</strong>で、角材・板・日本建築の反り屋根のような「曲がった形」を非破壊で作る。足りない分はプロポーショナル編集で追い込む。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >順番は <strong><code>Ctrl+A &gt; スケール</code> → ループカットで分割 → シンプル変形 &gt; ベンド</strong>。この3つのどれかを飛ばすと「曲がらない」「楕円に歪む」のどちらかになる。</span
+        >
+        <p>
+          反り屋根は<strong>角度を上げるのではなく、角度は控えめにして Limits で効く範囲を先端に絞る</strong>のが自然。もっと感覚的に滑らかなラインが欲しければ、シンプル変形ではなく<strong>ラティス</strong>に行く。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Steps</span>基本の手順</h2>
+        <ol class="steps">
+          <li>
+            <strong><code>Ctrl+A &gt; スケール</code></strong>
+            <p>必ず最初に。軸がおかしいなら <code>Ctrl+A &gt; 回転とスケール</code>。</p>
+          </li>
+          <li>
+            <strong>ループカット（<code>Ctrl+R</code>）を複数入れる</strong>
+            <p>辺が無いところは曲がらない。分割数がそのまま滑らかさになる。</p>
+          </li>
+          <li><strong>シンプル変形モディファイア &gt; ベンド</strong></li>
+          <li>
+            必要ならエンプティを<strong>「原点」（Origin）</strong>に指定
+            <p>曲げの支点を軒先や柱の付け根に置きたいとき。</p>
+          </li>
+          <li>軸と角度を調整</li>
+          <li>
+            足りない分は編集モードで<strong>プロポーショナル編集（<code>O</code>）</strong>で追い込む
+          </li>
+        </ol>
+        <div class="note">
+          <p>
+            <strong>「全トランスフォーム」は使わない。</strong>位置まで適用されて原点がワールド原点に飛ぶため、ベンドの中心が変わってしまう。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>前提：なぜこの順番でないと駄目なのか</h2>
+
+        <h3>スケール適用（手順1）</h3>
+        <blockquote class="manual">
+          <p>
+            シンプル変形の<strong>変形はローカル空間で計算される</strong>。ローカル軸はグローバル軸と異なり得るため、<strong>シーン内で回転したオブジェクトは自分自身の向きを基準に変形する</strong>。
+          </p>
+        </blockquote>
+        <p>
+          つまり<strong>ローカル座標で曲げた結果が、あとからオブジェクトのスケールで引き伸ばされる</strong>。スケールが <code>1,1,1</code> でないと、曲がりが楕円に歪む。回転も同じ理屈で、意図しない軸で曲がるときは回転が適用されていないことが多い。
+        </p>
+
+        <h3>ループカット（手順2）</h3>
+        <p>
+          <strong>曲げは頂点を動かすことでしか表現できない。辺が無いところは曲がらない。</strong>
+        </p>
+        <ul class="ticks">
+          <li>分割数 ＝ 曲がりの滑らかさ</li>
+          <li>目安：<strong>90°曲げるなら最低8〜12分割</strong>、180°なら16〜24分割</li>
+          <li>分割が足りないと、曲がらずに「カクッ」と折れるか、<strong>まったく変化しない</strong></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Axis</span>ベンドの「軸」でハマる理由</h2>
+        <blockquote class="manual">
+          <p>
+            ベンドの結果は<strong>変形軸と曲げ軸の組み合わせ</strong>に依存する。X または Y 変形は Z に沿って曲がり、Z 変形は X に沿って曲がる。<strong>平らな平面を X または Y で変形しても変化が現れない</strong>。すべての頂点の Z 座標が同じだからである。
+          </p>
+        </blockquote>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">症状</th>
+                <th scope="col">原因</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">軸を変えても何も起きない</th>
+                <td>曲げる方向に<strong>厚み（座標の差）が無い</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">板をベンドしたいのに無反応</th>
+                <td>
+                  平面のまま。<strong>ソリッド化で厚みを付ける</strong>か、軸の組み合わせを変える
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          「軸を総当たりで試す」のではなく、<strong>どの方向に座標の差があるか</strong>を考えると一発で決まる。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Limits</span>反り屋根の決め手：制限（Limits）</h2>
+        <blockquote class="manual">
+          <p>
+            <strong>Limits</strong>：<strong>変形軸に沿った範囲にモディファイアの影響を制限する</strong>。距離は<strong>オブジェクトの原点から測られ</strong>、上限は下限より低くできない。
+          </p>
+        </blockquote>
+        <p>
+          <strong>日本建築の反り屋根は「全体が曲がる」のではなく「先端だけ反る」。</strong>これを再現するのが Limits。
+        </p>
+        <figure>
+          <svg
+            viewBox="0 0 600 200"
+            role="img"
+            aria-label="Limits の効果を示す断面図。オブジェクトの原点を 0.0、先端を 1.0 とする変形軸上で、下限 0.6 / 上限 1.0 に設定すると、原点から 0.6 までは水平のまま変化せず、0.6 から先端の 1.0 までの先端40%だけが上に反り上がる。下限 0.0 / 上限 1.0 の既定では全体が均一に曲がる"
+          >
+            <g fill="currentColor" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">
+              <!-- 変形軸の目盛り -->
+              <path
+                d="M60 150 H520"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1"
+                stroke-dasharray="4 4"
+                opacity="0.35"
+              />
+              <path d="M60 144 V156 M324 144 V156 M520 144 V156" stroke="currentColor" stroke-width="1" opacity="0.5" />
+              <text x="60" y="174" text-anchor="middle" font-size="11" opacity="0.8">0.0</text>
+              <text x="324" y="174" text-anchor="middle" font-size="11" opacity="0.8">0.6</text>
+              <text x="520" y="174" text-anchor="middle" font-size="11" opacity="0.8">1.0</text>
+              <text x="60" y="192" text-anchor="middle" font-size="11" opacity="0.7">原点</text>
+              <text x="520" y="192" text-anchor="middle" font-size="11" opacity="0.7">先端</text>
+
+              <!-- 曲げる前の形 -->
+              <path
+                d="M60 110 H520"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1"
+                stroke-dasharray="5 5"
+                opacity="0.3"
+              />
+              <text x="470" y="128" font-size="11" opacity="0.6">元の形</text>
+
+              <!-- Limits を入れた屋根の断面 -->
+              <path
+                d="M60 110 H324 C 392 110, 452 98, 520 56"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              />
+
+              <!-- 効く範囲のブラケット -->
+              <path
+                d="M324 34 V22 H520 V34"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                opacity="0.7"
+              />
+              <text x="422" y="16" text-anchor="middle" font-size="11" opacity="0.85">
+                先端40%だけ反る
+              </text>
+
+              <!-- 境界線 -->
+              <path
+                d="M324 40 V144"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1"
+                stroke-dasharray="3 3"
+                opacity="0.5"
+              />
+              <text x="150" y="98" font-size="11" opacity="0.8">ここは動かない（下限より手前）</text>
+            </g>
+          </svg>
+          <figcaption>
+            下限 <code>0.6</code> / 上限 <code>1.0</code> の例。距離はオブジェクトの原点から変形軸に沿って測られる。
+          </figcaption>
+        </figure>
+        <pre><code>下限 = 0.6 / 上限 = 1.0   → 先端40%だけ反る
+下限 = 0.0 / 上限 = 1.0   → 全体が均一に曲がる（既定）</code></pre>
+        <p>
+          角度を上げて全体を曲げるより、<strong>角度は控えめ＋Limits で範囲を絞る</strong>ほうが自然になる。
+        </p>
+
+        <h3>もう一段上の制御：頂点グループ</h3>
+        <blockquote class="manual">
+          <p>
+            <strong>Vertex Group</strong>：<strong>頂点の重みを使って、各頂点がどれだけ強く影響を受けるかを制御する</strong>。
+          </p>
+        </blockquote>
+        <ul class="ticks">
+          <li>Limits は「ここからここまで」という<strong>ハッキリした境界</strong></li>
+          <li>頂点グループは<strong>ウェイトペイントで連続的に</strong>効きをコントロールできる</li>
+        </ul>
+        <p>
+          「根元はまったく曲げず、中間からじわっと、先端で最大」といった<strong>滑らかな反り</strong>はこちら。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Origin</span>エンプティを「原点」にする意味</h2>
+        <blockquote class="manual">
+          <p>
+            <strong>Origin</strong>：変形の原点と軸を設定する外部オブジェクト（通常はエンプティ）。<strong>位置が原点を決め、回転が変形軸を決め、スケールが変形の係数を変える。</strong>
+          </p>
+        </blockquote>
+        <p><strong>エンプティのスケールまで効く</strong>のは見落としやすい。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">エンプティの操作</th>
+                <th scope="col">効果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">移動</th>
+                <td>曲げの中心が動く（どこを支点に曲げるか）</td>
+              </tr>
+              <tr>
+                <th scope="row">回転</th>
+                <td>曲げの軸が変わる（モディファイアの軸ボタンより自由）</td>
+              </tr>
+              <tr>
+                <th scope="row">スケール</th>
+                <td><strong>曲がりの強さが変わる</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          支点を「屋根の軒先」や「柱の付け根」に置けるので、現実の曲がり方を再現しやすい。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Modes</span>シンプル変形の4モード</h2>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">モード</th>
+                <th scope="col">マニュアルの定義</th>
+                <th scope="col">用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ベンド</th>
+                <td>選択した軸に沿ってメッシュを曲げる</td>
+                <td>曲がった角、反り屋根、アーチ</td>
+              </tr>
+              <tr>
+                <th scope="row">ねじれ（Twist）</th>
+                <td>
+                  オブジェクト原点まわりに頂点を回転。<strong>原点より下は負、上は正</strong>に回転し、<strong>原点の平面上の頂点は動かない</strong>
+                </td>
+                <td>ねじれた柱、ドリル、螺旋</td>
+              </tr>
+              <tr>
+                <th scope="row">テーパー</th>
+                <td>
+                  軸に沿って<strong>原点からの距離に比例して</strong>線形に拡大縮小。原点の平面では変化なし
+                </td>
+                <td>先細りの角、円錐状</td>
+              </tr>
+              <tr>
+                <th scope="row">ストレッチ</th>
+                <td>
+                  軸に沿って伸ばす。<strong>正の値で伸びて原点が細くなり、負の値で潰れて原点が太くなる</strong>
+                </td>
+                <td>弾性変形、スクワッシュ＆ストレッチ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <p>
+            <strong>ロック X/Y/Z は「ねじれ・テーパー・ストレッチでのみ利用可能」。</strong>ベンドでは使えないので、「ロックが出てこない」と悩む必要はない。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Order</span>モディファイアの順序で結果が変わる</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">順序</th>
+                <th scope="col">結果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">サブディビジョン → シンプル変形</th>
+                <td>先に滑らかにしてから曲げる。<strong>きれいだが重い</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">シンプル変形 → サブディビジョン</th>
+                <td>曲げてから滑らかに。<strong>軽いが角が丸まりやすい</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">ミラー → シンプル変形</th>
+                <td>左右<strong>対称に</strong>曲がる。<strong>屋根はこれ</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">シンプル変形 → ミラー</th>
+                <td>曲げた形を鏡像化。<strong>左右で曲がりが逆向き</strong>になる</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>「左右で反り方が違う」はこの順序ミスが原因。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Alt</span>シンプル変形で無理なときの選択肢</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">使うもの</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">S字など自由な曲線に沿わせたい</th>
+                <td><strong>カーブモディファイア</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">感覚的に滑らかなラインを作りたい</th>
+                <td><strong>ラティス</strong>（反り屋根の本命）</td>
+              </tr>
+              <tr>
+                <th scope="row">既存の面（地形など）に貼り付けたい</th>
+                <td>シュリンクラップ</td>
+              </tr>
+              <tr>
+                <th scope="row">球状・円筒状に寄せたい</th>
+                <td>キャスト</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>ラティスが反り屋根に向く理由</h3>
+        <blockquote class="manual">
+          <p><strong>頂点の多い密なメッシュの変形に向く</strong>（直接編集するより速い）</p>
+          <p><strong>手でスカルプトするのが難しい滑らかな変形</strong>を作れる</p>
+          <p><strong>1つのラティスを共有して複数オブジェクトをまとめて制御</strong>できる</p>
+          <p>元のジオメトリは無傷なので<strong>非破壊</strong>。<strong>テクスチャ座標に影響しない</strong></p>
+        </blockquote>
+        <p>
+          屋根・瓦・棟・軒先を<strong>まとめて同じラティスで反らせられる</strong>のが決定的に強い。
+        </p>
+
+        <h3>ラティスの使い方</h3>
+        <pre><code>Shift+A &gt; ラティス
+オブジェクトデータプロパティ &gt; 解像度 U / V / W を 3〜5 に上げる
+（屋根なら U=5, V=3, W=2 くらい）
+
+対象メッシュを選択 &gt; モディファイア &gt; 変形 &gt; ラティス
+  オブジェクト = そのラティス
+
+または：メッシュ → ラティスの順に選択 &gt; Ctrl+P &gt; ラティス変形</code></pre>
+        <p>
+          あとは<strong>ラティスを編集モードで動かすだけ</strong>でメッシュが追従する。<strong>ストレンジス（Strength）</strong>で効き具合をブレンドできる。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Proportional</span>プロポーショナル編集を正しく使う</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><code>O</code></th>
+                <td>
+                  有効化／無効化
+                  <span class="ui">オブジェクトモードでも使える（オブジェクト単位で効く）</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row"><code>Alt+O</code></th>
+                <td>接続のみ（Connected Only）</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>Shift+O</code></th>
+                <td>フォールオフのパイメニュー</td>
+              </tr>
+              <tr>
+                <th scope="row">変形中にホイール／<code>PageUp</code>・<code>PageDown</code></th>
+                <td><strong>影響半径を変える。これを知らないと使えない</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>接続のみ（<code>Alt+O</code>）</h3>
+        <blockquote class="manual">
+          <p>
+            影響が<strong>メッシュの辺のつながりに沿って</strong>広がる。手のモデルの<strong>別の指のように、トポロジー的に繋がっていない近接ジオメトリは影響を受けない</strong>。※<strong>編集モードのみ</strong>で利用可能
+          </p>
+        </blockquote>
+        <p>重なっている別パーツを巻き込まずに済む。基本オンでよい。</p>
+
+        <h3>ビューから投影（Projected from View）</h3>
+        <blockquote class="manual">
+          <p>有効にすると、半径を適用する際に<strong>視線方向の奥行きが無視される</strong>。</p>
+        </blockquote>
+        <p>正面から見た形だけを整えたいときに使う。</p>
+
+        <h3>フォールオフの使い分け</h3>
+        <p>
+          種類は<strong>一定 / ランダム / リニア / シャープ / ルート / 球状 / スムーズ / 逆二乗</strong>。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">反りの表情</th>
+                <th scope="col">フォールオフ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">自然でなだらかな反り</th>
+                <td><strong>スムーズ / 球状</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">先端だけキュッと鋭く</th>
+                <td>シャープ</td>
+              </tr>
+              <tr>
+                <th scope="row">根元から急に立ち上がる</th>
+                <td>ルート</td>
+              </tr>
+              <tr>
+                <th scope="row">直線的に持ち上げる</th>
+                <td>リニア</td>
+              </tr>
+              <tr>
+                <th scope="row">岩肌・自然物のランダム感</th>
+                <td>ランダム</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Finish</span>仕上げで効くこと</h2>
+        <ul class="ticks">
+          <li>
+            曲げたあとに<strong>スムーズシェード＋スムーズ・バイ・アングル</strong>をかける
+          </li>
+          <li>角を立てたいなら<strong>ベベル</strong>か<strong>サポートループ（<code>Ctrl+R</code>）</strong></li>
+          <li>
+            <strong>モディファイアを適用する前に必ず複製を残す</strong>
+            <p><code>Shift+D</code>、またはリンク複製なら <code>Alt+D</code>。</p>
+          </li>
+          <li>
+            <code>N</code> パネルの<strong>寸法で実寸を確認</strong>しておく
+            <p>小さすぎるとライティングが破綻する。</p>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Pitfalls</span>よくある失敗と対処</h2>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">症状</th>
+                <th scope="col">原因</th>
+                <th scope="col">対処</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">曲げても何も起きない</th>
+                <td>分割が足りない／平らな面を X・Y でベンドしている</td>
+                <td>ループカットを増やす／軸の組み合わせを見直す</td>
+              </tr>
+              <tr>
+                <th scope="row">曲がりが楕円に歪む</th>
+                <td>スケールが <code>1,1,1</code> でない</td>
+                <td><code>Ctrl+A &gt; スケール</code></td>
+              </tr>
+              <tr>
+                <th scope="row">変な位置を中心に曲がる</th>
+                <td>原点がずれている</td>
+                <td>原点を移動、またはエンプティを Origin に指定</td>
+              </tr>
+              <tr>
+                <th scope="row">曲げすぎて潰れる・自己交差する</th>
+                <td>角度が大きすぎる</td>
+                <td>角度を下げて <strong>Limits</strong> で範囲を絞る</td>
+              </tr>
+              <tr>
+                <th scope="row">左右で反りが違う</th>
+                <td>ミラーとシンプル変形の<strong>順序</strong></td>
+                <td>ミラーを先にする</td>
+              </tr>
+              <tr>
+                <th scope="row">一部だけ曲げたいのに全体が曲がる</th>
+                <td>Limits 未設定</td>
+                <td><strong>Limits</strong> か<strong>頂点グループ</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">プロポーショナル編集で関係ない所まで動く</th>
+                <td>接続のみがオフ</td>
+                <td><code>Alt+O</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Recap</span>まとめ</h2>
+        <ul class="marks">
+          <li class="bad">
+            <strong>スケール未適用のまま、分割の無いメッシュをベンドする。</strong>
+            <p>歪むか、まったく変化しないかのどちらか。</p>
+          </li>
+          <li class="good">
+            <strong><code>Ctrl+A &gt; スケール</code> → ループカット → ベンドの順に進める。</strong>
+          </li>
+          <li class="good">
+            <strong>先端だけ反らせたいなら Limits、滑らかに効かせたいなら頂点グループ。</strong>
+          </li>
+          <li class="good">
+            <strong>屋根はミラーを先に置く。</strong>
+            <p>順序が逆だと左右で曲がりが反転する。</p>
+          </li>
+          <li class="good">
+            <strong>感覚的に滑らかなラインが欲しければラティスに切り替える。</strong>
+            <p>屋根・瓦・棟・軒先をまとめて1つのラティスで反らせられる。</p>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li><strong>オブジェクトの原点（オレンジの点）</strong> — 変形の支点になる</li>
+          <li><strong>ループカットで角のシャープさを制御する</strong></li>
+          <li>
+            <strong>トーラスに巻きつくコイルを作る</strong> — カーブモディファイアで曲げる例
+          </li>
+          <li><strong>シェーディングの種類と自動スムーズシェード</strong></li>
+          <li><strong>物体のサイズとライティングの関係</strong></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
