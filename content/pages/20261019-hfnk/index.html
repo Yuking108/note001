@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ブーリアンがきちんと切れない（閉じた立体・法線・ソルバー）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が多い／セルが長い表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td .ui {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.88em;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+      ol.steps > li pre {
+        margin: 0.5rem 0 0;
+      }
+      ol.steps > li .scroll-x {
+        margin: 0.7rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.ticks > li {
+        position: relative;
+        padding-left: 1.1rem;
+        margin-bottom: 0.9rem;
+        line-height: 1.75;
+      }
+      ul.ticks > li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+      ul.ticks > li p {
+        margin: 0.2rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      /* ✕ / ○ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>ブーリアンがきちんと切れない（閉じた立体・法線・ソルバー）</h1>
+        <p class="standfirst">
+          ブーリアンは面ではなく<strong>体積</strong>の演算。カッターと対象が「水も漏らさない閉じた立体」で、法線が外向きに揃っていなければ、Blender は内外を決められず切れない。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >上から順に <strong>①ソルバーを <code>Exact</code> ②<code>A &gt; Shift+N</code> で法線を外向き ③<code>選択 &gt; すべてを選択（特徴）&gt; 非多様体</code> で穴を探す</strong>。大半はこの3つで直る。</span
+        >
+        <p>
+          とくに<strong>辺（エッジループ）を押し出して作った筒</strong>は、ふたが無いか法線が内向きかのどちらかで、このどちらも「閉じた体積」として成立しない。原因が分からないうちは、<strong>円柱プリミティブで作り直すのが最短</strong>のことも多い。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Why</span>なぜ閉じていないと切れないのか</h2>
+        <blockquote class="manual">
+          <p>
+            <strong>多様体（Manifold）メッシュだけが正しい結果を保証される。</strong>非多様体メッシュ、とくに穴のあるものは「たいていうまく動くが、<strong>奇妙なグリッチやアーティファクトが出ることがある</strong>」。<strong>Manifold ソルバーは非多様体メッシュではまったく動作しない。</strong>
+          </p>
+        </blockquote>
+        <p>
+          「面が足りない」「辺が3枚以上の面に共有されている」といった状態では、<strong>どこが内側でどこが外側か決められない</strong>。だから切れないか、変な結果になる。開いた筒は「どこが内側か」が数学的に定義できないので、<strong>どこを削ればいいかも決められない</strong>。
+        </p>
+        <figure>
+          <svg
+            viewBox="0 0 600 230"
+            role="img"
+            aria-label="2つの筒の断面比較図。左の円柱プリミティブは上下に「ふた」の面があり、閉じた体積として成立するのでブーリアンが効く。右の、円を辺のまま押し出したものは上下が開口していて面が無く、内側が定義できないのでブーリアンが成立しない"
+          >
+            <g fill="currentColor" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">
+              <!-- 左：閉じた円柱 -->
+              <path
+                d="M100 50 H200 V170 H100 Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              />
+              <text x="150" y="36" text-anchor="middle" font-size="11" opacity="0.85">ふた</text>
+              <text x="150" y="190" text-anchor="middle" font-size="11" opacity="0.85">ふた</text>
+              <text x="150" y="116" text-anchor="middle" font-size="12">閉じた体積</text>
+              <text x="150" y="216" text-anchor="middle" font-size="11" opacity="0.7">
+                円柱プリミティブ ＝ 切れる
+              </text>
+
+              <!-- 右：両端が開いた筒 -->
+              <path d="M400 170 V50" fill="none" stroke="currentColor" stroke-width="2.5" />
+              <path d="M500 170 V50" fill="none" stroke="currentColor" stroke-width="2.5" />
+              <path
+                d="M400 50 H500"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-dasharray="5 6"
+                opacity="0.45"
+              />
+              <path
+                d="M400 170 H500"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-dasharray="5 6"
+                opacity="0.45"
+              />
+              <text x="450" y="36" text-anchor="middle" font-size="11" opacity="0.85">
+                開口（面が無い）
+              </text>
+              <text x="450" y="190" text-anchor="middle" font-size="11" opacity="0.85">
+                開口（面が無い）
+              </text>
+              <text x="450" y="110" text-anchor="middle" font-size="12">体積が</text>
+              <text x="450" y="128" text-anchor="middle" font-size="12">定義できない</text>
+              <text x="450" y="216" text-anchor="middle" font-size="11" opacity="0.7">
+                円を辺で押し出したもの ＝ 切れない
+              </text>
+            </g>
+          </svg>
+          <figcaption>
+            実線が面のある部分、破線が面の無い開口部。右は形だけ筒に見えるが、ブーリアンから見ると立体ではない。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Order</span>切り分けの順番</h2>
+        <pre><code>1. ソルバーを Exact に                                  ← まずこれ
+2. A &gt; Shift+N（法線を外向きに）
+   └ オーバーレイ &gt; 面の向き で赤が無いか確認
+3. A &gt; M &gt; 距離で結合（重複頂点）
+4. 選択 &gt; すべてを選択（特徴）&gt; 非多様体 で穴を探す
+5. Exact の「自己交差」「穴の許容」をオン
+6. カッターを完全に貫通させる／0.001m ずらす
+7. Ctrl+A &gt; スケール
+8. モディファイアの順序（特にミラー）</code></pre>
+        <p>
+          上の3つはメッシュ側の素性を疑う工程、下の方はブーリアンの設定や配置を疑う工程。<strong>上から順に潰していけば、どこで直ったかが原因そのものになる</strong>。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Solver</span>1. ソルバーを Exact に変える</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">ソルバー</th>
+                <th scope="col">マニュアルの説明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Float<span class="ui">旧「高速 / Fast」</span></th>
+                <td>
+                  シンプルで<strong>性能が良いが、重なったジオメトリに対応していない</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Exact<span class="ui">完全</span></th>
+                <td>
+                  複雑だが<strong>最良の結果</strong>。<strong>重なったジオメトリに完全対応</strong>。ただし<strong>かなり遅い</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Manifold</th>
+                <td>
+                  <strong>たいてい最速</strong>だが、<strong>多様体メッシュでしか動かない</strong>（例外：平面との差分）
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>切れないならまず Exact。</strong>これだけで直ることが非常に多い。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Normals</span>2. 法線を外向きに直す</h2>
+        <p>裏返った面があると、Blender は内外を判定できない。</p>
+        <pre><code>編集モード &gt; A（全選択） &gt; Shift+N</code></pre>
+        <blockquote class="manual">
+          <p>
+            「Mesh &gt; Normals &gt; <strong>Recalculate Outside</strong>」／ショートカット <strong>Shift-N</strong>。「選択した面を必要に応じて反転させ、<strong>すべて外向き（または内向き）に揃える</strong>」
+          </p>
+        </blockquote>
+        <p>
+          <strong>確認方法：オーバーレイ &gt; 面の向き（Face Orientation）。</strong>マニュアル曰く「<strong>面が間違った向きになっているものを素早く見つけるのに役立つ</strong>」。
+        </p>
+        <div class="note">
+          <p>
+            <strong>青が表（外向き）／赤が裏。赤が1枚でも見えたらアウト</strong>で、<code>Shift+N</code>。目で見るのが確実なので、法線を疑うときは必ずこのオーバーレイを出す。
+          </p>
+        </div>
+        <p>
+          とくに<strong>辺（エッジループ）を押し出して作った筒は、側面の法線が内向きになりやすい</strong>。辺の巻き方向から面の向きが決まるため、プリミティブのように「必ず外向き」にはならない。さらに <code>F</code> で張ったふたも、向きは自動では揃わない。形は閉じていても、<strong>Blender から見ると「どっちが外か分からない立体」</strong>のままになる。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Merge</span>3. 重複頂点を結合する</h2>
+        <pre><code>編集モード &gt; A &gt; M &gt; 距離で結合</code></pre>
+        <blockquote class="manual">
+          <p>
+            <strong>Merge by Distance</strong> ＝「一定距離より近い頂点のクラスタをそれぞれ結合する」
+          </p>
+        </blockquote>
+        <p>
+          左下に「Removed N vertices」と出たら、<strong>それが原因だった可能性が高い</strong>。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Non-manifold</span>4. 非多様体を探す</h2>
+        <pre><code>選択 &gt; すべてを選択（特徴）&gt; 非多様体</code></pre>
+        <blockquote class="manual">
+          <p>
+            「<strong>メッシュの非多様体ジオメトリを選択する</strong>」※<strong>頂点選択モードと辺選択モードでのみ利用可能</strong>
+          </p>
+        </blockquote>
+        <p>
+          <strong>選ばれた場所がそのまま原因。</strong>何も光らなければ形状は OK なので、法線かソルバーの問題に絞れる。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">症状</th>
+                <th scope="col">対処</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">穴が開いている（面が足りない）</th>
+                <td>穴の縁を選択して <code>F</code> で面を張る</td>
+              </tr>
+              <tr>
+                <th scope="row">1つの辺を3枚以上の面が共有</th>
+                <td>余分な面を削除</td>
+              </tr>
+              <tr>
+                <th scope="row">浮いた頂点・辺がある</th>
+                <td>メッシュ &gt; クリーンアップ &gt; <strong>孤立要素を削除</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">内部に面がある</th>
+                <td>
+                  <code>選択 &gt; すべてを選択（特徴）&gt; 内側の面</code> → <code>X &gt; 面</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Escape</span>5. Exact の「自己交差」「穴の許容」</h2>
+        <blockquote class="manual">
+          <p>
+            <strong>Self Intersection（自己交差）</strong>：参加しているメッシュの<strong>自己交差を正しく処理する</strong>。ただし<strong>性能コストがかかる</strong>。
+          </p>
+          <p>
+            <strong>Hole Tolerant（穴の許容）</strong>：<strong>非多様体ジオメトリ向けに出力を最適化する</strong>（計算時間は増える）。<strong>Exact ソルバーが非多様体ジオメトリでエラーを出すときだけ有効にすること。</strong>
+          </p>
+        </blockquote>
+        <p>
+          メッシュを直せない事情があるときの<strong>逃げ道</strong>。常時オンにするものではない。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Placement</span>6〜8. 形は正しいのに切れないとき</h2>
+
+        <h3>カッターが貫通しきっていない</h3>
+        <p>
+          差分（Difference）で「途中までしか切れない」なら、<strong>カッターが対象を完全に突き抜けていない</strong>。カッターを少し大きくして、<strong>両側にはみ出させる</strong>。
+        </p>
+
+        <h3>面がぴったり同一平面で接している</h3>
+        <p>
+          カッターの面と対象の面が<strong>完全に同じ平面</strong>にあると、内外が決まらず破綻する。<strong>カッターを 0.001 m ほどずらす。</strong>（面のガビガビ＝Zファイティングと同じ根っこの問題）
+        </p>
+
+        <h3>スケールが適用されていない</h3>
+        <pre><code>Ctrl+A &gt; スケール</code></pre>
+      </section>
+
+      <section>
+        <h2><span class="lead">Modifiers</span>9〜10. 順序とオペランドタイプ</h2>
+        <p>ブーリアンは<strong>その時点での形</strong>に対して働く。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">順序</th>
+                <th scope="col">結果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ミラー → ブーリアン</th>
+                <td>ミラー<strong>後</strong>の形を切る（両側が切れる）</td>
+              </tr>
+              <tr>
+                <th scope="row">ブーリアン → ミラー</th>
+                <td>切った形を鏡像化（<strong>切り口も鏡像になる</strong>）</td>
+              </tr>
+              <tr>
+                <th scope="row">サブディビジョン → ブーリアン</th>
+                <td>滑らかになった後の形を切る</td>
+              </tr>
+              <tr>
+                <th scope="row">ブーリアン → サブディビジョン</th>
+                <td>切ってから滑らかに（<strong>切り口が溶ける</strong>）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>「片側しか切れていない」はミラーとの順序が原因のことが多い。</strong>
+        </p>
+
+        <h3>オペランドタイプ</h3>
+        <blockquote class="manual">
+          <p>
+            <strong>オブジェクト</strong>：ソースは<strong>単一のメッシュオブジェクト</strong>
+          </p>
+          <p>
+            <strong>コレクション</strong>：ソースは<strong>任意の数のメッシュオブジェクト</strong>。※<strong>Float ソルバーでは Intersect（交差）が使えない</strong>
+          </p>
+        </blockquote>
+        <p>複数のカッターで切るならコレクションにまとめる。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Case</span>実例：押し出した筒では切れず、円柱プリミティブでは切れた</h2>
+        <p>
+          <strong>違いは「ふた（キャップ）があるかどうか」＝閉じた立体かどうか。</strong>追加時の既定値が円と円柱で違うのが原因。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">ふたのタイプ（Fill Type）</th>
+                <th scope="col">円（Circle）の定義</th>
+                <th scope="col">円柱（Cylinder）の定義</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">なし（Nothing）</th>
+                <td>
+                  円を塗りつぶさず、<strong>外周の頂点だけ</strong>を作る
+                  <span class="ui">← 円の既定</span>
+                </td>
+                <td>
+                  端のふたは追加されない。<strong>側面だけが作られ、筒になる</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Nゴン</th>
+                <td>中心を<strong>1枚のNゴン面</strong>で埋める</td>
+                <td>
+                  <strong>両端がそれぞれ1枚のNゴン面で埋められる</strong>
+                  <span class="ui">← 円柱の既定</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">三角の扇（Triangle Fan）</th>
+                <td>中心の頂点を共有する三角形の面で埋める</td>
+                <td>両端が中心頂点を共有する三角形で埋められる</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="marks">
+          <li class="bad">
+            <strong>円は既定で「ふた＝なし」。</strong>
+            <p>
+              面が存在しないので、押し出しているのは「面」ではなく<strong>辺（エッジループ）</strong>。結果は<strong>両端とも開いた筒</strong>で、ふたが1枚も無い。
+            </p>
+          </li>
+          <li class="good">
+            <strong>円柱は既定で「Nゴン」。</strong>
+            <p>最初から完全に閉じた立体なので、ブーリアンが成立する。</p>
+          </li>
+        </ul>
+        <div class="note">
+          <p>
+            <strong>面を押し出せば、ちゃんと閉じる。</strong>押し出し（領域）の挙動は「境界ループが1つの面にしか属していない場合、選択した面はすべて<strong>複製され</strong>、新しく作られた面とリンクされる」「それ以外の場合、選択した面は新しい面にリンクされるが<strong>複製はされない</strong>」。
+          </p>
+          <p>
+            つまり<strong>単独の円の面</strong>を押し出せば元の面も残り、閉じた円柱になる。失敗していたのは「<strong>ふたの無い円を、辺で押し出していた</strong>」から。
+          </p>
+        </div>
+
+        <h3>直し方</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">方法</th>
+                <th scope="col">手順</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">① ふたを張る<span class="ui">最速</span></th>
+                <td>
+                  開いた縁を <code>Alt+クリック</code> でループ選択 → <code>F</code>（Nゴンが張られる）。<strong>両端やる</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">② 作る段階で直す</th>
+                <td>
+                  円を追加した直後に <code>F9 &gt; ふたのタイプ = Nゴン</code> → そのあと<strong>面モードで押し出す</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">③ 厚みを付ける</th>
+                <td>ソリッド化モディファイアを適用（形は変わる）</td>
+              </tr>
+              <tr>
+                <th scope="row">④ 応急処置</th>
+                <td>
+                  ブーリアンを Exact にして<strong>穴の許容（Hole Tolerant）</strong>をオン
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <p>
+            <strong>教訓：ブーリアンのカッターは「水も漏らさない閉じた立体」でなければならない。</strong>押し出しで作ったものは、必ず両端が閉じているか確認する。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Still</span>「F でふたを閉じたのに、まだ切れない」</h2>
+        <p>
+          ふたを張っても切れないなら、<strong>次に疑うのは法線</strong>（上の「2. 法線を外向きに直す」をそのまま実行する）。それでも駄目なら <code>F</code> の張り方を疑う。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">ありがちなミス</th>
+                <th scope="col">正しいやり方</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">全頂点を選択したまま <code>F</code> を押した</th>
+                <td>
+                  <strong>辺モード</strong>にして <code>Alt+クリック</code> で<strong>縁のループだけ</strong>を選択 → <code>F</code>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">片方の端しか塞いでいない</th>
+                <td><strong>両端</strong>やる</td>
+              </tr>
+              <tr>
+                <th scope="row">縁が平面でない</th>
+                <td>
+                  <code>S &gt; Z &gt; 0</code>（軸は向きによる）で平らに揃えてから <code>F</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          再チェックは <code>選択 &gt; すべてを選択（特徴）&gt; 非多様体</code>。<strong>まだ光るなら塞ぎ切れていない。ここが空なら形状は OK ＝ 法線かソルバーの問題。</strong>
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Toolbox</span>決定的な診断ツール：3Dプリントツールボックス</h2>
+        <p>メッシュが「水密（watertight）」かどうかを一発で判定できる。</p>
+        <blockquote class="manual">
+          <p>
+            <strong>Solid（ソリッド）チェック</strong>：「<strong>非多様体の辺</strong>と<strong>不正な連続辺（Bad Contiguous edges）</strong>を探す。これらは<strong>メッシュが水密でない</strong>ことを意味しうる」
+          </p>
+          <p>
+            <strong>非多様体の辺</strong>：「<strong>辺は正確に2枚の面に接続しているべき</strong>。<strong>1枚なら穴があり</strong>、3枚以上も許されない」
+          </p>
+          <p>
+            <strong>Bad Contiguous edges</strong>：「<strong>ある面の法線が隣の面と違う方向を向いている</strong>ため、その辺がフラグされる」← <strong>法線の不整合がここに出る</strong>
+          </p>
+          <p>
+            <strong>Degenerate（縮退）</strong>：「<strong>面積が0の面／長さが0の辺</strong>」
+          </p>
+          <p><strong>Intersections（交差）</strong>：「別々のパーツの面が重なっている」</p>
+        </blockquote>
+        <p>
+          <strong>編集モードで結果をクリックすると、問題箇所が選択される。</strong>パネルは <strong>3Dビューポート &gt; サイドバー（<code>N</code>）&gt; 3D-Print タブ</strong>。<strong>「Check All」</strong>で全チェック、<strong>「Make Manifold」</strong>で自動修復もできる。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">バージョン</th>
+                <th scope="col">入手方法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">〜4.1</th>
+                <td>
+                  プリファレンス &gt; アドオン &gt; Mesh &gt; <strong>3D Print Toolbox</strong> を有効化
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">4.2 LTS 以降（5.x 含む）</th>
+                <td>
+                  <strong>プリファレンス &gt; 拡張機能</strong>で「<strong>3D Print Toolbox</strong>」を検索してインストール
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Shortcut</span>現実的な最短ルート：作り直す</h2>
+        <p>
+          <strong>円柱プリミティブで作り直す。</strong>そちらは問題なく切れることが確認できているので、「押し出しで作った筒を直す」より速いことが多い。
+        </p>
+        <pre><code>Shift+S &gt; カーソル → 選択物   ← 位置を記憶
+古い筒を削除（X）
+Shift+A &gt; メッシュ &gt; 円柱 → F9 で頂点数・半径・深度を指定</code></pre>
+      </section>
+
+      <section>
+        <h2><span class="lead">After</span>切れたけど見た目が汚い場合</h2>
+
+        <h3>切り口のトポロジーが汚い</h3>
+        <p>
+          <strong>これは正常。</strong>ブーリアンは切り口にNゴン（多角形面）を作る。サブディビジョンをかけるなら、適用後に手でループを整えるか、ベベルでエッジを締める。
+        </p>
+
+        <h3>マテリアルがおかしい</h3>
+        <blockquote class="manual">
+          <p>
+            <strong>Index Based</strong>：ソースのマテリアルスロットを<strong>順番で</strong>対応付ける。範囲外のインデックスの面は<strong>修正対象メッシュの最初のマテリアル</strong>を使う。
+          </p>
+          <p>
+            <strong>Transfer</strong>：<strong>ソースメッシュのマテリアルを使い</strong>、必要に応じてスロットを追加する。空のスロットはソースのマテリアルインデックスにフォールバックする。
+          </p>
+        </blockquote>
+      </section>
+
+      <section>
+        <h2><span class="lead">Recap</span>まとめ</h2>
+        <ul class="marks">
+          <li class="bad">
+            <strong>ふたの無い円を、辺のまま押し出して筒にする。</strong>
+            <p>閉じた体積にならず、法線も揃わない。ブーリアンは成立しない。</p>
+          </li>
+          <li class="good">
+            <strong>切れないならまず Exact。</strong>
+            <p>これだけで直ることが非常に多い。</p>
+          </li>
+          <li class="good">
+            <strong><code>A &gt; Shift+N</code> のあと、オーバーレイ &gt; 面の向きで赤が無いか目で見る。</strong>
+          </li>
+          <li class="good">
+            <strong>形状の疑いは「非多様体」選択、水密かどうかは 3Dプリントツールボックスで判定する。</strong>
+          </li>
+          <li class="good">
+            <strong>穴の許容（Hole Tolerant）は逃げ道。常時オンにはしない。</strong>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li>
+            <strong>ブーリアンモディファイア</strong> — 仕組み（面ではなく体積の演算）
+          </li>
+          <li>
+            <strong>面にガビガビのノイズが出る（Zファイティング）</strong> — 同一平面問題
+          </li>
+          <li><strong>面を別オブジェクトとして分離する</strong></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

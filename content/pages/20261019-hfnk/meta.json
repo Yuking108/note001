@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20261019-hfnk",
+  "title": "ブーリアンがきちんと切れない（閉じた立体・法線・ソルバー）",
+  "summary": "ブーリアンは「体積」の演算なので、カッターと対象が閉じた多様体メッシュでなければ破綻する。まず試すのはソルバーを Exact に変更・Shift+N で法線を外向き・距離で結合の3つで、円を辺で押し出した筒（ふたが無い）やミラーとの順序も典型的な原因。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/アドオン"
+  ],
+  "createdAt": "2026-10-19",
+  "updatedAt": "2026-10-19",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A/Q&A_ブーリアンがきちんと切れない.md",
+    "note": "docs/Q&A/Q&A_ブーリアンがきちんと切れない.md を夜間取り込みでページ化したもの"
+  }
+}
