@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "id": "20261019-jpeq",
+  "title": "編集モードで頂点同士を接続する（F / J / M の使い分け）",
+  "summary": "「接続」には4種類あり、面を割りたいなら F ではなく J（頂点の経路を連結）。F は辺／面を新規に作るだけで面は1枚のまま、M は頂点を溶接、頂点ペアを連結は同じ面を共有するペア限定。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/テクニック"
+  ],
+  "createdAt": "2026-10-19",
+  "updatedAt": "2026-10-19",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_編集モードで頂点を接続する.md",
+    "note": "docs/テクニック/TIPS_編集モードで頂点を接続する.md を夜間取り込みでページ化したもの"
+  }
+}

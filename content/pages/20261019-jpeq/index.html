@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>編集モードで頂点同士を接続する（F / J / M の使い分け）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・引用・注記・キー表記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が多い／セルが長い表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td .ui {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.88em;
+      }
+      /* 表の中のショートカットキー */
+      .key {
+        display: inline-block;
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 5px;
+        padding: 0.05em 0.5em;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.ticks > li {
+        position: relative;
+        padding-left: 1.1rem;
+        margin-bottom: 0.9rem;
+        line-height: 1.75;
+      }
+      ul.ticks > li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+      ul.ticks > li p {
+        margin: 0.2rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      /* ✕ / ○ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>編集モードで頂点同士を接続する（F / J / M の使い分け）</h1>
+        <p class="standfirst">
+          「接続する」には<strong>4つの意味</strong>があり、それぞれ別の操作になる。ここを混同するとハマる。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >辺を<strong>足す</strong>なら <code>F</code>、面を<strong>割る</strong>なら
+          <code>J</code>、頂点を<strong>1つにまとめる</strong>なら <code>M</code>。</span
+        >
+        <p>
+          いちばん多い事故は、面を割るつもりで <code>F</code> を押すこと。<code>F</code>
+          は面を分割しないので、辺が面の内側に浮くだけで形は変わらない。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Index</span>早見表</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">操作（メニュー）</th>
+                <th scope="col">キー</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">2つの頂点を辺でつなぐ</th>
+                <td>頂点 &gt; 頂点から新しい辺/面を作成</td>
+                <td><span class="key">F</span></td>
+              </tr>
+              <tr>
+                <th scope="row">面を分割するようにつなぐ</th>
+                <td>頂点 &gt; <strong>頂点の経路を連結</strong></td>
+                <td><span class="key">J</span></td>
+              </tr>
+              <tr>
+                <th scope="row">面上の頂点ペアをまとめてつなぐ</th>
+                <td>頂点 &gt; <strong>頂点ペアを連結</strong></td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <th scope="row">2つの頂点を1つにまとめる（溶接）</th>
+                <td><strong>マージ</strong></td>
+                <td><span class="key">M</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">F vs J</span>F と J の違い（最重要）</h2>
+        <figure>
+          <svg
+            viewBox="0 0 600 240"
+            role="img"
+            aria-label="四角形の面の対角にある2頂点をつないだときの比較図。左は F で、対角線の辺はできるが面は1枚のままで、辺が面の内側に浮いている。右は J で、同じ対角線によって面が2枚の三角形に分割されている"
+          >
+            <g fill="currentColor" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">
+              <!-- 左：F -->
+              <path
+                d="M90 60 H210 V180 H90 Z"
+                fill="currentColor"
+                opacity="0.07"
+                stroke="none"
+              />
+              <path d="M90 60 H210 V180 H90 Z" fill="none" stroke="currentColor" stroke-width="2.5" />
+              <path d="M90 180 L210 60" fill="none" stroke="currentColor" stroke-width="2" />
+              <circle cx="90" cy="180" r="4" />
+              <circle cx="210" cy="60" r="4" />
+              <text x="150" y="40" text-anchor="middle" font-size="13" font-weight="700">F</text>
+              <text x="150" y="208" text-anchor="middle" font-size="11" opacity="0.85">
+                辺はできるが、面は1枚のまま
+              </text>
+              <text x="150" y="228" text-anchor="middle" font-size="11" opacity="0.7">
+                （辺が面の内側に浮いているだけ）
+              </text>
+
+              <!-- 右：J -->
+              <path d="M390 60 H510 L390 180 Z" fill="currentColor" opacity="0.14" stroke="none" />
+              <path d="M510 60 V180 H390 Z" fill="currentColor" opacity="0.04" stroke="none" />
+              <path
+                d="M390 60 H510 V180 H390 Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              />
+              <path d="M390 180 L510 60" fill="none" stroke="currentColor" stroke-width="2.5" />
+              <circle cx="390" cy="180" r="4" />
+              <circle cx="510" cy="60" r="4" />
+              <text x="450" y="40" text-anchor="middle" font-size="13" font-weight="700">J</text>
+              <text x="450" y="208" text-anchor="middle" font-size="11" opacity="0.85">
+                面が2枚に分かれる
+              </text>
+              <text x="450" y="228" text-anchor="middle" font-size="11" opacity="0.7">
+                （選択した順に繋いで切っていく）
+              </text>
+            </g>
+          </svg>
+          <figcaption>
+            同じ2頂点を選んで同じ位置に辺を引いても、面が割れるかどうかが違う。「つないだはずなのに形が変わらない」はこれ。
+          </figcaption>
+        </figure>
+        <ul class="marks">
+          <li class="bad">
+            <strong><code>F</code> は面を分割しない。</strong>
+            <p>面の上にある2頂点を F でつないでも、辺が面の内側に浮くだけで面は1枚のまま。</p>
+          </li>
+          <li class="good">
+            <strong>面を切りたいなら <code>J</code>。</strong>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">F</span>F：辺や面を「新しく作る」</h2>
+        <blockquote class="manual">
+          <p>
+            <strong>New Edge/Face from Vertices</strong>：「<strong>選択した頂点の間に面を作成する</strong>」「<strong>頂点が2つだけ選択されている場合は、代わりに辺を作成する</strong>」
+          </p>
+          <p>メニュー：頂点 &gt; 頂点から新しい辺/面を作成 ／ ショートカット <strong>F</strong></p>
+        </blockquote>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">選択数</th>
+                <th scope="col">結果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">2頂点</th>
+                <td><strong>辺</strong>ができる</td>
+              </tr>
+              <tr>
+                <th scope="row">3〜4頂点</th>
+                <td>三角形／四角形の<strong>面</strong>ができる</td>
+              </tr>
+              <tr>
+                <th scope="row">5頂点以上</th>
+                <td><strong>1枚のNゴン</strong>ができる</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>注意点（マニュアル記載）</h3>
+        <ul class="ticks">
+          <li>
+            既存の<strong>面を複数選択して F</strong> を押すと、重なる面を作るのではなく<strong>1枚の面に溶解（dissolve）する</strong>。離れた島をまたいでも効く
+          </li>
+          <li>
+            <strong>辺から作ったNゴンは穴を持てない。</strong>穴が必要なら「フェイス &gt; フィル」を使う
+          </li>
+          <li>
+            辺の連なりに<strong>内部の辺がある場合、1枚ではなく複数の面</strong>が作られる
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">J</span>J：面を分割しながらつなぐ（本命）</h2>
+        <blockquote class="manual">
+          <p>
+            <strong>Connect Vertex Path</strong>：「<strong>選択した順に頂点の間に辺を作成し、その途中で面を分割する</strong>」
+          </p>
+          <p>メニュー：頂点 &gt; 頂点の経路を連結 ／ ショートカット <strong>J</strong></p>
+        </blockquote>
+        <ul class="ticks">
+          <li><strong>選択した順番が結果を決める</strong>（順番に繋いでいく）</li>
+          <li>複数の面をまたいで繋げる</li>
+          <li><strong>面がちゃんと2つに分かれる</strong></li>
+        </ul>
+
+        <h3>使いどころ</h3>
+        <ul class="ticks">
+          <li>Nゴンを四角形に割りたい</li>
+          <li>任意の位置に辺を通したい（ループカットでは通せない斜めの線など）</li>
+          <li>ブーリアンの切り口など、汚いトポロジーを整える</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Pairs</span>頂点ペアを連結：順番を気にせず一括で</h2>
+        <blockquote class="manual">
+          <p>
+            <strong>Connect Vertex Pairs</strong>：「<strong>同じ面を共有する選択頂点の各ペアの間に辺を作成し、その面を2つに分割する</strong>」
+          </p>
+          <p>メニュー：頂点 &gt; 頂点ペアを連結</p>
+        </blockquote>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col"></th>
+                <th scope="col">頂点の経路を連結（J）</th>
+                <th scope="col">頂点ペアを連結</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">選択順</th>
+                <td><strong>影響する</strong>（順に繋ぐ）</td>
+                <td><strong>関係ない</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">範囲</th>
+                <td>複数の面をまたげる</td>
+                <td>
+                  <strong>同じ面を共有する頂点どうしのみ</strong>（1面を超えて離れた頂点は繋がらない）
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">用途</th>
+                <td>経路を指定して切る</td>
+                <td>たくさんのペアを一気に割る</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">M</span>M：頂点を「1つにまとめる」（溶接）</h2>
+        <p>繋ぐのではなく<strong>融合</strong>させたいときはこちら。</p>
+        <blockquote class="manual">
+          <p>
+            <strong>マージ</strong>（Mesh &gt; マージ ／ 右クリック &gt; マージ、ショートカット
+            <strong>M</strong>）
+          </p>
+        </blockquote>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">距離で結合</th>
+                <td>
+                  「<strong>一定距離より近い頂点のクラスタをそれぞれ結合する</strong>」。オプション
+                  <strong>結合距離</strong>＝「この距離より近い頂点が結合される」／<strong>非選択</strong>＝「選択頂点と非選択頂点の結合を許可」
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">中心に</th>
+                <td>選択頂点を<strong>その平均位置</strong>の1頂点にまとめる</td>
+              </tr>
+              <tr>
+                <th scope="row">カーソルに</th>
+                <td><strong>3Dカーソルの位置</strong>にまとめる</td>
+              </tr>
+              <tr>
+                <th scope="row">束ねる（Collapse）</th>
+                <td><strong>繋がったグループごと</strong>に、それぞれの平均位置へまとめる</td>
+              </tr>
+              <tr>
+                <th scope="row">最初に / 最後に</th>
+                <td>
+                  <strong>最初／最後に選択した頂点</strong>の位置にまとめる
+                  <span class="ui">※頂点選択モードのみ</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>使い分け</h3>
+        <pre><code>離れた2点を「くっつけたい」          → M &gt; 中心に
+片方の位置に合わせてくっつけたい      → M &gt; 最後に（合わせたい方を最後に選択）
+重複頂点の掃除                       → A（全選択）&gt; M &gt; 距離で結合</code></pre>
+      </section>
+
+      <section>
+        <h2><span class="lead">Others</span>そのほかの「つなぐ」</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">離れた2つの穴／ループをつなぐ</th>
+                <td>両方の縁を選択 &gt; <strong>辺 &gt; 辺ループのブリッジ</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">自由な位置で切る</th>
+                <td><strong>ナイフツール</strong> <code>K</code></td>
+              </tr>
+              <tr>
+                <th scope="row">視点から見て真っ直ぐ切る</th>
+                <td>
+                  <strong>ナイフトポロジーツール</strong>（「現在の視点から見て<strong>完全に真っ直ぐな切断</strong>を行う」）
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">頂点を重ねたら自動で結合させたい</th>
+                <td>ヘッダー &gt; オプション &gt; <strong>自動マージ</strong> をオン</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Troubleshoot</span>よくあるつまずき</h2>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">症状</th>
+                <th scope="col">原因</th>
+                <th scope="col">対処</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">F でつないだのに面が分かれない</th>
+                <td>F は面を分割しない</td>
+                <td><code>J</code> を使う</td>
+              </tr>
+              <tr>
+                <th scope="row">J を押しても何も起きない</th>
+                <td>頂点が<strong>別オブジェクト</strong>に属している</td>
+                <td>
+                  オブジェクトモードで両方選択 &gt; <code>Ctrl+J</code> で統合してから
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">頂点ペアを連結で繋がらない</th>
+                <td><strong>同じ面を共有していない</strong>（1面以上離れている）</td>
+                <td><code>J</code> を使う</td>
+              </tr>
+              <tr>
+                <th scope="row">F で変な面ができる</th>
+                <td>5点以上選んで<strong>Nゴン</strong>になっている</td>
+                <td>4点ずつ選ぶ／<code>J</code> で割る</td>
+              </tr>
+              <tr>
+                <th scope="row">つないだつもりが辺が二重</th>
+                <td>重複頂点がある</td>
+                <td><code>A &gt; M &gt; 距離で結合</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li>
+            <strong>ブーリアンがきちんと切れない</strong> — 穴を塞ぐときの F の使い方
+          </li>
+          <li>
+            <strong>面にガビガビのノイズが出る（Zファイティング）</strong> — 重複頂点の掃除
+          </li>
+          <li><strong>ループカットで角のシャープさを制御する</strong></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
