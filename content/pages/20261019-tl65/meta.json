@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "id": "20261019-tl65",
+  "title": "あとから円柱の面数（頂点数）を変更したい（F9の使いどころ）",
+  "summary": "結論は「移動や選択をした時点でもう変えられない」。F9（最後の操作を調整）は追加した直後だけ有効なので、Ctrl+Z で戻すか作り直すしかなく、あとから何度も変えたいならジオメトリノードの円柱ノード（パラメトリック）で作るのが正解。",
+  "mainLabel": "Blender/モデリング",
+  "subLabels": [
+    "Blender/Q&A",
+    "Blender/ユーザーインターフェース"
+  ],
+  "createdAt": "2026-10-19",
+  "updatedAt": "2026-10-19",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "Q&A/Q&A_あとから円柱の面数を変更したい（F9）.md",
+    "note": "docs/Q&A/Q&A_あとから円柱の面数を変更したい（F9）.md を夜間取り込みでページ化したもの"
+  }
+}

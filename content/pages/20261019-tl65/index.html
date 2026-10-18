@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>あとから円柱の面数（頂点数）を変更したい（F9の使いどころ）</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が多い／セルが長い表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td .ui {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.88em;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+      ol.steps > li pre {
+        margin: 0.5rem 0 0;
+      }
+      ol.steps > li .scroll-x {
+        margin: 0.7rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.ticks > li {
+        position: relative;
+        padding-left: 1.1rem;
+        margin-bottom: 0.9rem;
+        line-height: 1.75;
+      }
+      ul.ticks > li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+      ul.ticks > li p {
+        margin: 0.2rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      /* ✕ / ○ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      dl.defs {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+      }
+      dl.defs dt {
+        font-weight: 700;
+        margin-top: 1rem;
+      }
+      dl.defs dt:first-child {
+        margin-top: 0;
+      }
+      dl.defs dd {
+        margin: 0.2rem 0 0;
+        color: var(--fg-muted);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>あとから円柱の面数（頂点数）を変更したい（F9の使いどころ）</h1>
+        <p class="standfirst">
+          円柱を置いたあとで「頂点数をもっと増やしたい」と思っても、パネルが出てこない。原因はキーの取り違えと、<strong>F9 が効く期間がとても短い</strong>こと。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >まず <code>F12</code> は<strong>レンダリング</strong>で、面数とは無関係。使うのは
+          <code>F9</code>（最後の操作を調整）。そして——<strong>移動したあとでは、もう変更できない。</strong></span
+        >
+        <p>
+          移動を取り消せる段階なら <code>Ctrl+Z</code> で F9 が復活する。それより先に進んでしまったら作り直す。<strong>あとから何度も変えたいものは、最初からジオメトリノードの円柱ノードで作る。</strong>
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Keys</span>まず2つ訂正</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">キー</th>
+                <th scope="col">実際の機能</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><code>F12</code></th>
+                <td>レンダリング（画像をレンダー）。<strong>面数とは無関係</strong></td>
+              </tr>
+              <tr>
+                <th scope="row"><code>F9</code></th>
+                <td>
+                  最後の操作を調整（Adjust Last Operation）。<strong>こちらが目的のもの</strong>
+                  <span class="ui">ビューポート左下のヘッドアップディスプレイのパネルと同じ中身</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why</span>なぜ、あとからだと出てこないのか</h2>
+        <p>公式マニュアルの説明はこうなっている。</p>
+        <blockquote class="manual">
+          <p>「<strong>オペレーターを実行した後に、そのパラメーターを調整できる</strong>」</p>
+          <p>「対応しているエディターでは、<strong>左下にヘッドアップディスプレイのパネル</strong>がある」</p>
+          <p>「F9（編集 &gt; 最後の操作を調整）のポップアップも<strong>同じことをする</strong>」</p>
+          <p>「このパネルは<strong>最後に実行された操作に基づく</strong>」</p>
+        </blockquote>
+        <p>
+          効いてくるのは最後の一行。<strong>「最後に実行された操作」に基づく</strong>ので、円柱を追加したあとに別の操作をした瞬間、パネルの中身が入れ替わる。
+        </p>
+        <figure>
+          <svg
+            viewBox="0 0 600 210"
+            role="img"
+            aria-label="F9 のパネルが何を映すかを示す図。上の行は、円柱を追加した直後に F9 を押すと「頂点数・半径・深度」のパネルが出て調整できる状態。下の行は、そのあと G キーで移動すると最後の操作が「移動」に入れ替わり、F9 を押しても「移動」のオプションしか出ず、頂点数は調整できない状態"
+          >
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="12"
+            >
+              <g>
+                <rect
+                  x="8"
+                  y="18"
+                  width="150"
+                  height="42"
+                  rx="7"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.8"
+                />
+                <text x="83" y="44" text-anchor="middle">円柱を追加</text>
+                <path
+                  d="M166 39 H218"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.6"
+                />
+                <path d="M218 39 l-8 -4 v8 z" fill="currentColor" opacity="0.6" />
+                <rect
+                  x="228"
+                  y="18"
+                  width="86"
+                  height="42"
+                  rx="7"
+                  fill="currentColor"
+                  fill-opacity="0.07"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.8"
+                />
+                <text x="271" y="44" text-anchor="middle" font-family="ui-monospace, monospace">
+                  F9
+                </text>
+                <path
+                  d="M322 39 H374"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.6"
+                />
+                <path d="M374 39 l-8 -4 v8 z" fill="currentColor" opacity="0.6" />
+                <text x="386" y="36">頂点 / 半径 / 深度</text>
+                <text x="386" y="54" font-size="11" opacity="0.8">○ 調整できる</text>
+              </g>
+
+              <path
+                d="M83 68 V104"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-dasharray="5 4"
+                opacity="0.6"
+              />
+              <path d="M83 104 l-4 -8 h8 z" fill="currentColor" opacity="0.6" />
+              <text x="95" y="92" font-size="11" opacity="0.85">G で移動（選択やクリックでも同じ）</text>
+
+              <g>
+                <rect
+                  x="8"
+                  y="112"
+                  width="150"
+                  height="42"
+                  rx="7"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.8"
+                />
+                <text x="83" y="138" text-anchor="middle">移動（Move）</text>
+                <path
+                  d="M166 133 H218"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.6"
+                />
+                <path d="M218 133 l-8 -4 v8 z" fill="currentColor" opacity="0.6" />
+                <rect
+                  x="228"
+                  y="112"
+                  width="86"
+                  height="42"
+                  rx="7"
+                  fill="currentColor"
+                  fill-opacity="0.07"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.8"
+                />
+                <text x="271" y="138" text-anchor="middle" font-family="ui-monospace, monospace">
+                  F9
+                </text>
+                <path
+                  d="M322 133 H374"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  opacity="0.6"
+                />
+                <path d="M374 133 l-8 -4 v8 z" fill="currentColor" opacity="0.6" />
+                <text x="386" y="130">「移動」のオプション</text>
+                <text x="386" y="148" font-size="11" opacity="0.8">✕ 頂点数は出ない</text>
+              </g>
+
+              <text x="8" y="190" font-size="11" opacity="0.75">
+                F9 が映すのは常に「最後に実行された操作」ひとつだけ
+              </text>
+            </g>
+          </svg>
+          <figcaption>
+            移動した瞬間、最後の操作が「追加」から「移動」に入れ替わる。選択やクリックでも同じように入れ替わる。
+          </figcaption>
+        </figure>
+
+        <h3>もっと根本的な理由</h3>
+        <p>
+          <strong>Blender のプリミティブはパラメトリックではない。</strong>「頂点32個の円柱オブジェクト」が存在しているのではなく、<strong>作られた瞬間にただの頂点と面の集合</strong>になっている。F9 は「もう一度作り直す」機能であって、既存のメッシュの設定を書き換えているわけではない。だから編集したあとに戻れるはずがない。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Fix</span>対処法（上から順に試す）</h2>
+
+        <h3>1. 追加した直後に F9（本来の使い方）</h3>
+        <pre><code>Shift+A &gt; メッシュ &gt; 円柱
+→ 何もせずに F9（または左下のパネルを開く）
+→ 頂点 / 半径 / 深度 / ふたの塗りつぶし を調整</code></pre>
+        <p>
+          <strong>追加した直後に必ず数値を決める</strong>のを習慣にするのが、結局いちばん早い。
+        </p>
+
+        <h3>2. <code>Ctrl+Z</code> で追加直後まで戻ってから F9</h3>
+        <p>
+          移動しただけなら、<code>Ctrl+Z</code> を1回押して移動を取り消せば、最後の操作が「追加」に戻るので F9 が使える。
+        </p>
+
+        <h3>3. 消して作り直す（結局これが一番速いことが多い）</h3>
+        <p>移動した位置を保ちたいなら、3Dカーソルを使う。</p>
+        <ol class="steps">
+          <li>
+            <strong>3Dカーソルをそのオブジェクトにスナップ</strong>
+            <pre><code>Shift+S &gt; カーソル → 選択物</code></pre>
+          </li>
+          <li>古い円柱を削除（<code>X</code>）</li>
+          <li>
+            <strong><code>Shift+A &gt; メッシュ &gt; 円柱</code></strong>
+            <p>3Dカーソルの位置に作られる。</p>
+          </li>
+          <li><code>F9</code> で頂点数を指定</li>
+        </ol>
+
+        <h3>4. あとから何度でも変えたいなら：ジオメトリノード</h3>
+        <p>
+          <strong>これが本当の解決策。</strong>ジオメトリノードの<strong>円柱ノード</strong>はパラメトリックなので、<strong>いつでも頂点数を変えられる</strong>。
+        </p>
+        <ol class="steps">
+          <li>オブジェクトを選択</li>
+          <li>ジオメトリノードプロパティ &gt; <strong>新規</strong></li>
+          <li><code>Shift+A &gt; メッシュ &gt; プリミティブ &gt; 円柱</code></li>
+          <li>グループ出力に繋ぐ</li>
+          <li>モディファイアパネルに「頂点」などが出てくるので、<strong>いつでも変更できる</strong></li>
+        </ol>
+        <p>
+          <strong>あとから何度も調整する可能性があるものは、最初からジオメトリノードで作る</strong>のが正解。各入力の意味は<a href="#cylinder-node">下の表</a>にまとめた。
+        </p>
+
+        <h3>5. Python コンソールから作る</h3>
+        <pre><code>import bpy
+bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=0.5, depth=2, location=(0,0,0))</code></pre>
+        <p>数値を書き換えて実行し直せば何度でも作れる。</p>
+      </section>
+
+      <section id="cylinder-node">
+        <h2><span class="lead">Node</span>ジオメトリノードの円柱ノード：入力の意味</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">入力</th>
+                <th scope="col">マニュアルの定義</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">頂点（Vertices）</th>
+                <td>
+                  <strong>上面と下面の円上の頂点数</strong>
+                  <span class="ui">3未満ではジオメトリが生成されない</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">サイドセグメント</th>
+                <td>
+                  側面に沿って<strong>垂直に走る辺の数</strong>
+                  <span class="ui">1未満では生成されない</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">フィルセグメント</th>
+                <td>上面・下面の丸い面を埋めるのに使う<strong>同心円状のリングの数</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">半径</th>
+                <td>
+                  <strong>Z軸からの頂点の距離</strong>
+                  <span class="ui">0だと出力は1本の線になる</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">深度</th>
+                <td><strong>円柱の高さ</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">フィルタイプ（プロパティ）</th>
+                <td>
+                  半径が0より大きいとき、<strong>上下の円をどう面で埋めるか</strong>
+                  <span class="ui">なし / Nゴン / 三角形</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Edit mode</span>編集モードで分割を増やしたい場合</h2>
+        <p>
+          既存の円柱の<strong>円周方向の分割数</strong>を直接変えることはできないが、近いことはできる。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">やりたいこと</th>
+                <th scope="col">方法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">高さ方向の分割を増やす</th>
+                <td><code>Ctrl+R</code>（ループカット）／側面を選択して細分化</td>
+              </tr>
+              <tr>
+                <th scope="row">円周方向の分割を倍にする</th>
+                <td>側面の垂直な辺をすべて選択 &gt; 右クリック &gt; <strong>細分化</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <p>
+            ただし<strong>細分化しただけでは新しい頂点は円弧上ではなく多角形の辺の上に乗る</strong>ので、断面が真円から外れる。円形に整えるには <strong>LoopTools アドオンの「円」</strong>を使うか、素直に作り直す。
+          </p>
+        </div>
+        <p>
+          <strong>結論：円周の分割数を変えたいなら作り直したほうが速くてきれい。</strong>
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Recap</span>まとめ</h2>
+        <ul class="marks">
+          <li class="bad">
+            <strong><code>F12</code> はレンダリング。</strong>
+            <p>面数とは別の機能。</p>
+          </li>
+          <li class="good">
+            <strong><code>F9</code> は最後の操作を調整。追加した「直後」だけ有効。</strong>
+            <p>移動・選択など別の操作をした時点で、もう変えられない。</p>
+          </li>
+          <li class="good">
+            <strong>変えられなくなったら <code>Ctrl+Z</code> で戻るか、作り直す。</strong>
+          </li>
+          <li class="good">
+            <strong>あとから変えたいものは、ジオメトリノードの円柱ノードで作る。</strong>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li>
+            <strong>面にガビガビのノイズが出る（Zファイティング）</strong> — 作り直し時の重複メッシュに注意
+          </li>
+          <li><strong>サブディビジョンのショートカットとレベル設定</strong></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
