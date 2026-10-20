@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>面や辺を削除したあとに残る「緑の線」は何か</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が多い／セルが長い表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td .ui {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.88em;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+      ol.steps > li pre {
+        margin: 0.5rem 0 0;
+      }
+      ol.steps > li .scroll-x {
+        margin: 0.7rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.ticks > li {
+        position: relative;
+        padding-left: 1.1rem;
+        margin-bottom: 0.9rem;
+        line-height: 1.75;
+      }
+      ul.ticks > li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+      ul.ticks > li p {
+        margin: 0.2rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      /* ✕ / ○ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      dl.defs {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+      }
+      dl.defs dt {
+        font-weight: 700;
+        margin-top: 1rem;
+      }
+      dl.defs dt:first-child {
+        margin-top: 0;
+      }
+      dl.defs dd {
+        margin: 0.2rem 0 0;
+        color: var(--fg-muted);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>面や辺を削除したあとに残る「緑の線」は何か</h1>
+        <p class="standfirst">
+          原因は2通りある。<strong>削除で取り残された孤立した辺・頂点</strong>か、<strong>辺に付いた「マーク」の表示色</strong>。前者なら消せば直り、後者は消してはいけない。見分け方は「まず孤立要素を削除してみる」。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >編集モードで <strong>メッシュ &gt; クリーンアップ &gt; 孤立要素を削除</strong> を実行する。これで消えたら取り残された辺・頂点だった（実際のケースはこれ）。</span
+        >
+        <p>
+          <strong>消えなければ辺に付いた「マーク」。</strong>面に囲まれた生きている辺にマークが付いている場合なので、<strong>削除してはいけない</strong>（形が壊れる）。辺メニューからマークをクリアするのが正解。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Triage</span>切り分けの手順</h2>
+        <p>上から順に試す。どこで緑線が消えたかで正体が分かる。</p>
+        <ol class="steps">
+          <li>
+            <strong>メッシュ &gt; クリーンアップ &gt; 孤立要素を削除</strong>
+            <p>消えた → 孤立ジオメトリだった。これで終わり。</p>
+          </li>
+          <li>
+            <code>A</code> で全選択 → <code>M</code> &gt; <strong>距離で結合</strong>
+            <p>消えた → 同じ位置に重なった重複頂点だった。</p>
+          </li>
+          <li>
+            どちらでも消えない → <strong>マーク付きの辺</strong>
+            <p>辺メニューから シャープ／フリースタイル／シームをクリアする。下の表を参照。</p>
+          </li>
+        </ol>
+        <div class="note">
+          <p>
+            <strong>順番を守ること。</strong>「削除すれば消える」でほぼ常に合っているが、例外として
+            <strong>面に囲まれた生きている辺にマークが付いている</strong>ケースがある。先に削除を試して、消えなければマークを疑う。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Cause 1</span>なぜ孤立した辺・頂点が残るのか</h2>
+        <p>
+          削除メニューの<strong>どの選択肢を選んだかで、孤立要素を残すかどうかが変わる</strong>。公式マニュアル（メッシュ &gt; 削除）の定義はこうなっている。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">選択肢</th>
+                <th scope="col">何が消えるか</th>
+                <th scope="col">孤立要素は</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">頂点</th>
+                <td>選択した頂点と、<strong>それが属する辺と面も</strong>削除する</td>
+                <td>残らない</td>
+              </tr>
+              <tr>
+                <th scope="row">辺</th>
+                <td>選択した辺と、<strong>それが属する面も</strong>削除する</td>
+                <td>孤立した頂点も削除される</td>
+              </tr>
+              <tr>
+                <th scope="row">面</th>
+                <td>選択した面を削除する</td>
+                <td>孤立した頂点と辺も削除される</td>
+              </tr>
+              <tr>
+                <th scope="row">辺と面のみ</th>
+                <td>
+                  選択した辺と面、および<strong>選択した辺を含む未選択の面も</strong>削除する
+                </td>
+                <td><strong>孤立した頂点は残される</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">面のみ</th>
+                <td>選択した面を削除する</td>
+                <td><strong>孤立した頂点と辺は残される</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          つまり<strong>「面のみ」「辺と面のみ」は、孤立要素をわざと残す仕様</strong>。骨組み（辺）だけ残して作り直したいときのための選択肢であって、
+          <strong>普通に消したいなら <code>X &gt; 頂点</code> か <code>X &gt; 面</code> を使う。</strong>
+        </p>
+
+        <h3>残った孤立要素をまとめて消す</h3>
+        <pre><code>メッシュ &gt; クリーンアップ &gt; 孤立要素を削除（Delete Loose）</code></pre>
+        <blockquote class="manual">
+          <p>「<strong>何にも繋がっていない</strong>、選択した頂点・辺（およびオプションで面）を削除する」</p>
+        </blockquote>
+
+        <h3>消す前に目で確認したいなら</h3>
+        <pre><code>選択 &gt; すべてを選択（特徴）&gt; 緩いジオメトリ
+→ 光ったものが孤立要素
+→ X &gt; 頂点</code></pre>
+        <blockquote class="manual">
+          <p>
+            <strong>Loose Geometry</strong>：「選択モードに応じて、<strong>どの辺にも属さない頂点</strong>／<strong>どの面にも属さない辺</strong>／<strong>他の面と辺を共有しない面</strong>を選択する」
+          </p>
+        </blockquote>
+
+        <h3>重なって二重になっている場合</h3>
+        <p>
+          位置が同じ頂点が2つある（重複）なら、<strong>孤立ではない</strong>ので「孤立要素を削除」では取れない。
+        </p>
+        <pre><code>A（全選択）&gt; M &gt; 距離で結合</code></pre>
+        <blockquote class="manual">
+          <p>
+            <strong>Merge by Distance</strong>：「<strong>一定距離より近い頂点のクラスタをそれぞれ結合する</strong>」
+          </p>
+        </blockquote>
+        <p>左下の「Removed N vertices」で、いくつ消えたか確認できる。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Cause 2</span>辺に付いた「マーク」の色</h2>
+        <p>
+          Blender の辺には<strong>形とは別に属性（マーク）を持たせる</strong>ことができ、編集モードではそれぞれ<strong>違う色</strong>で表示される。
+        </p>
+        <div class="scroll-x">
+          <table class="wide">
+            <thead>
+              <tr>
+                <th scope="col">マーク</th>
+                <th scope="col">色</th>
+                <th scope="col">用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">シーム（Seam）</th>
+                <td>赤</td>
+                <td>選択した辺を <strong>UVシーム</strong>として設定／解除する</td>
+              </tr>
+              <tr>
+                <th scope="row">シャープ（Sharp）</th>
+                <td>シアン（水色〜青緑）</td>
+                <td>選択した辺を<strong>シャープ</strong>として設定／解除する</td>
+              </tr>
+              <tr>
+                <th scope="row">クリース（Crease）</th>
+                <td>紫（マゼンタ）</td>
+                <td>サブディビジョンサーフェスでの折り目の強さ</td>
+              </tr>
+              <tr>
+                <th scope="row">ベベルウェイト</th>
+                <td>黄</td>
+                <td>ベベルモディファイアの重み</td>
+              </tr>
+              <tr>
+                <th scope="row">フリースタイルの辺マーク</th>
+                <td>緑</td>
+                <td>
+                  選択した辺を <strong>Freestyle のラインが必要</strong>なものとしてマーク／解除する
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="ticks">
+          <li><strong>はっきり緑なら「フリースタイルの辺マーク」</strong></li>
+          <li><strong>青みがかった緑（水色）なら「シャープ」</strong></li>
+        </ul>
+        <div class="note">
+          <p>
+            色は<strong>テーマで決まる</strong>（<code>プリファレンス &gt; テーマ &gt; 3Dビューポート</code>）。マニュアルに色の記載はない。
+          </p>
+        </div>
+
+        <h3>どのマークか確実に特定する</h3>
+        <p>
+          ビューポート右上の<strong>オーバーレイのポップオーバー</strong>（重なった2つの円の ▼）を開き、<strong>メッシュ編集モード</strong>の項目を<strong>1つずつオフ</strong>にする。<strong>消えた項目が正体。</strong>
+        </p>
+        <dl class="defs">
+          <dt>Seams</dt>
+          <dd>UV展開のシームを表示する</dd>
+          <dt>Sharp</dt>
+          <dd><strong>辺分離モディファイアで使われる</strong>シャープな辺を表示する</dd>
+          <dt>Creases</dt>
+          <dd>
+            <strong>サブディビジョンサーフェスモディファイア用</strong>にクリースが設定された辺を表示する
+          </dd>
+          <dt>Bevel</dt>
+          <dd><strong>ベベルモディファイア用</strong>に作られたウェイトを表示する</dd>
+          <dt>Freestyle Edge Marks</dt>
+          <dd>Freestyle の辺マークを表示する</dd>
+        </dl>
+
+        <h3>マークの消し方</h3>
+        <p>編集モードで該当の辺を選択 → <strong>辺（Edge）メニュー</strong>から。</p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">消したいもの</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">フリースタイル</th>
+                <td>辺 &gt; <strong>フリースタイルの辺をクリア</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">シャープ</th>
+                <td>辺 &gt; <strong>シャープをクリア</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">シーム</th>
+                <td>辺 &gt; <strong>シームをクリア</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">クリース</th>
+                <td>
+                  <code>Shift+E</code> → <code>-1</code> と入力
+                  <span class="ui">またはサイドバーで 0 にする</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">ベベルウェイト</th>
+                <td>辺 &gt; <strong>辺のベベルウェイト</strong> → 0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <blockquote class="manual">
+          <p>
+            <strong>Edge Crease</strong>：「選択した辺のクリース量を<strong>インタラクティブに変更する</strong>」ショートカット <strong>Shift-E</strong>。「<strong>正または負の数値を入力して現在の値に加算</strong>することもできる」／サイドバーでも編集可能。
+          </p>
+        </blockquote>
+        <p>全部まとめて消したいなら、<code>A</code> で全選択してから各クリアを実行する。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">Why now</span>なぜ削除した途端に出てきたのか</h2>
+        <p>
+          <strong>マークは「辺」が持っている属性</strong>であって、面の属性ではない。面があるうちは辺がメッシュの内側にあり、周囲の辺に埋もれて目立たない。面を削除すると<strong>その辺が「境界」になり、シルエット上に出てくる</strong>。
+        </p>
+        <figure>
+          <svg
+            viewBox="0 0 600 190"
+            role="img"
+            aria-label="面があるときとないときで、同じ辺の見え方が変わることを示す図。左は面が揃った格子で、マーク付きの辺が内側にあり周囲の辺に埋もれている。右は右上の面を削除した格子で、同じ辺がメッシュの境界（シルエット）に出てきて目立っている"
+          >
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="12"
+            >
+              <!-- 左：面がある -->
+              <text x="20" y="20" font-weight="700">面があるとき</text>
+              <g opacity="0.07">
+                <rect x="20" y="34" width="180" height="120" />
+              </g>
+              <g fill="none" stroke="currentColor" stroke-width="1" opacity="0.5">
+                <path d="M20 34 H200 M20 94 H200 M20 154 H200" />
+                <path d="M20 34 V154 M80 34 V154 M140 34 V154 M200 34 V154" />
+              </g>
+              <path
+                d="M140 34 V94"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+                opacity="0.55"
+              />
+              <text x="20" y="176" font-size="11" opacity="0.8">
+                マーク付きの辺は内側。周りに埋もれて気づかない
+              </text>
+
+              <!-- 右：面を削除した -->
+              <text x="372" y="20" font-weight="700">面を削除したあと</text>
+              <g opacity="0.07">
+                <rect x="372" y="34" width="120" height="120" />
+                <rect x="492" y="94" width="60" height="60" />
+              </g>
+              <g fill="none" stroke="currentColor" stroke-width="1" opacity="0.5">
+                <path d="M372 34 H492 M372 94 H552 M372 154 H552" />
+                <path d="M372 34 V154 M432 34 V154 M492 94 V154 M552 94 V154" />
+              </g>
+              <path
+                d="M492 34 V94"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+              />
+              <text x="372" y="176" font-size="11" opacity="0.8">
+                同じ辺が境界になり、線としてはっきり見える
+              </text>
+            </g>
+          </svg>
+          <figcaption>
+            <strong>新しく発生したのではなく、元からあったものが見えるようになっただけ。</strong>特に「シャープ」は、<strong>スムーズ・バイ・アングル</strong>や<strong>辺分離モディファイア</strong>を使うと自動的に付くことがある。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Caution</span>オブジェクトモードで見えているなら別の話</h2>
+        <p>
+          これらのマークは<strong>編集モードのオーバーレイ</strong>なので、<strong>オブジェクトモードでは出ない</strong>。それでも緑の線が見えているなら、候補は別にある。
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">候補</th>
+                <th scope="col">確認方法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">別のオブジェクトが選択されている（アウトライン）</th>
+                <td>アウトライナーで何が選択されているか見る</td>
+              </tr>
+              <tr>
+                <th scope="row">グリッドのY軸（緑）がオブジェクトと重なっている</th>
+                <td>視点を回すと線が動かない／オブジェクトから外れる</td>
+              </tr>
+              <tr>
+                <th scope="row">面を消して残った浮いた辺</th>
+                <td>
+                  <code>選択 &gt; すべてを選択（特徴）&gt; 緩いジオメトリ</code> で検出 →
+                  <code>X &gt; 辺</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Recap</span>覚え方</h2>
+        <ul class="marks">
+          <li class="good">
+            <strong>まず「孤立要素を削除」。</strong>
+            <p>削除メニューで「面のみ」「辺と面のみ」を選んでいると、辺や頂点がわざと残される。</p>
+          </li>
+          <li class="good">
+            <strong>消えなければ「距離で結合」。</strong>
+            <p>重複頂点は孤立ではないので、孤立要素の削除では取れない。</p>
+          </li>
+          <li class="bad">
+            <strong>それでも残る線を削除しない。</strong>
+            <p>生きている辺に付いたマーク。削除すると形が壊れる。辺メニューからクリアする。</p>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li>
+            <strong>シェーディングの種類と自動スムーズシェード</strong>
+            <p>シャープ辺が付く仕組み。</p>
+          </li>
+          <li>
+            <strong>ブーリアンがきちんと切れない</strong>
+            <p>浮いた辺・非多様体の掃除。</p>
+          </li>
+          <li><strong>編集モードで頂点を接続する</strong></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
