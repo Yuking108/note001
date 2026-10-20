@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UV Editorで合わせた画像をマテリアルとして反映させる</title>
+    <style>
+      /* ------------------------------------------------------------------
+         雛形のトークンを土台に、結論ボックス・手順の番号・引用・注記の色だけ足す。
+         足した色は明色・暗色の両方に定義する。
+         ------------------------------------------------------------------ */
+      /* 明色パレット（既定） */
+      :root {
+        --bg: #fbfaf9;
+        --fg: #1c1a18;
+        --fg-muted: #6b645d;
+        --border: #e3dfdb;
+        --accent: #b4551f;
+        --code-bg: #f3f1ef;
+
+        --border-soft: #edeae7;
+        --accent-ink: #8c4218;
+        --accent-bg: #f8eee6;
+        --accent-line: #e4c3ad;
+
+        --bad-ink: #9a3328;
+        --good-ink: #2f6b46;
+
+        --font-body:
+          ui-sans-serif, system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+          Meiryo, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --measure: 40rem;
+      }
+      /* 暗色パレット：色の定義をここだけに置かない（既定は必ず :root に持つ） */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17161a;
+          --fg: #eceaf0;
+          --fg-muted: #a39fab;
+          --border: #322f38;
+          --accent: #e8925c;
+          --code-bg: #26252b;
+
+          --border-soft: #292730;
+          --accent-ink: #f2ae7e;
+          --accent-bg: #2e2117;
+          --accent-line: #5a3d29;
+
+          --bad-ink: #f0918a;
+          --good-ink: #88c9a3;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        /* 透明にすると iframe 越しに親の色が透けるため、必ず不透明で塗る */
+        background-color: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.85;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 1.25rem;
+        text-wrap: balance;
+      }
+      .standfirst {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 1.02rem;
+        margin: 0;
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(to right, var(--accent) 0 3.5rem, var(--border) 3.5rem 100%);
+        margin-top: 2.5rem;
+      }
+      section {
+        margin-top: 3rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      section > h2:first-child {
+        margin-top: 0;
+      }
+      h2 .lead {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fg-muted);
+        margin-bottom: 0.4rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        max-width: var(--measure);
+        margin: 0 0 1.1rem;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        /* 長いパスや URL でも折り返す。1語のために文書全体が横に伸びるのを防ぐ */
+        overflow-wrap: anywhere;
+      }
+      /* 広い要素はそれぞれの内側でスクロールさせ、文書本体は横に伸ばさない */
+      pre,
+      .scroll-x {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      pre {
+        background: var(--code-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.9;
+        font-size: 0.85rem;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      .scroll-x {
+        margin: 1.4rem 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        /* 日本語の本文が入る表。これより狭いと1列が数文字まで潰れて縦書きのように読めなくなる。
+           はみ出す分は .scroll-x の内側で横スクロールさせる */
+        min-width: 36rem;
+        font-size: 0.93rem;
+      }
+      /* 列が多い／セルが長い表はさらに広く取る */
+      table.wide {
+        min-width: 46rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        line-height: 1.7;
+      }
+      th {
+        background: var(--code-bg);
+      }
+      tbody th {
+        font-weight: 700;
+      }
+      td .ui {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 0.88em;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figcaption {
+        max-width: var(--measure);
+        color: var(--fg-muted);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      img,
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* 結論そのもの。ここだけ大きく置く */
+      .verdict {
+        margin: 1.5rem 0 0;
+        padding: 1.4rem 1.5rem;
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 10px;
+        color: var(--accent-ink);
+      }
+      .verdict .big {
+        display: block;
+        font-size: 1.2rem;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+      .verdict p {
+        margin: 0.6rem 0 0;
+        max-width: none;
+        font-size: 0.95rem;
+      }
+
+      /* 手順。番号は absolute で置き、li 本体は padding で逃がす
+         （li を grid / flex にすると strong や code が独立した項目になって崩れる） */
+      ol.steps {
+        counter-reset: step;
+        list-style: none;
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: calc(1.7rem + 0.9rem);
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        width: 1.7rem;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7rem;
+        color: var(--accent-ink);
+        background: var(--accent-bg);
+        border: 1px solid var(--accent-line);
+        border-radius: 50%;
+      }
+      ol.steps > li p {
+        margin: 0.3rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+      ol.steps > li pre {
+        margin: 0.5rem 0 0;
+      }
+      ol.steps > li .scroll-x {
+        margin: 0.7rem 0 0;
+      }
+
+      ul.ticks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.ticks > li {
+        position: relative;
+        padding-left: 1.1rem;
+        margin-bottom: 0.9rem;
+        line-height: 1.75;
+      }
+      ul.ticks > li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.85em;
+        width: 6px;
+        height: 1px;
+        background: var(--fg-muted);
+      }
+      ul.ticks > li p {
+        margin: 0.2rem 0 0;
+        max-width: none;
+        font-size: 0.93rem;
+        color: var(--fg-muted);
+      }
+
+      /* ✕ / ○ の並び。記号は absolute で置く（li を grid にしない） */
+      ul.marks {
+        max-width: var(--measure);
+        list-style: none;
+        margin: 1.2rem 0;
+        padding: 0;
+      }
+      ul.marks > li {
+        position: relative;
+        padding-left: 1.9rem;
+        margin-bottom: 0.7rem;
+        line-height: 1.8;
+      }
+      ul.marks > li::before {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.3rem;
+        text-align: center;
+        font-weight: 700;
+      }
+      ul.marks > li.bad::before {
+        content: '✕';
+        color: var(--bad-ink);
+      }
+      ul.marks > li.good::before {
+        content: '○';
+        color: var(--good-ink);
+      }
+
+      .note {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0.9rem 1.1rem;
+        background: var(--code-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        font-size: 0.93rem;
+      }
+      .note p {
+        margin: 0;
+        max-width: none;
+      }
+      .note p + p {
+        margin-top: 0.6rem;
+      }
+
+      /* マニュアルの原文 */
+      blockquote.manual {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+        padding: 0 0 0 1.1rem;
+        border-left: 2px solid var(--accent-line);
+        color: var(--fg-muted);
+        font-size: 0.93rem;
+      }
+      blockquote.manual p {
+        margin: 0;
+        max-width: none;
+      }
+      blockquote.manual p + p {
+        margin-top: 0.6rem;
+      }
+      blockquote.manual strong {
+        color: var(--fg);
+      }
+
+      dl.defs {
+        max-width: var(--measure);
+        margin: 1.4rem 0;
+      }
+      dl.defs dt {
+        font-weight: 700;
+        margin-top: 1rem;
+      }
+      dl.defs dt:first-child {
+        margin-top: 0;
+      }
+      dl.defs dd {
+        margin: 0.2rem 0 0;
+        color: var(--fg-muted);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px 80px;
+        }
+        .verdict {
+          padding: 1.15rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>UV Editorで合わせた画像をマテリアルとして反映させる</h1>
+        <p class="standfirst">
+          UV Editor で画像を開いて丁寧に展開を合わせたのに、3Dビューのオブジェクトには何も出ない。UV
+          Editor の画像は<strong>展開の見本</strong>でしかなく、マテリアルとは別物だから。
+        </p>
+      </header>
+
+      <div class="rule"></div>
+
+      <div class="verdict">
+        <span class="big"
+          >同じ画像を、<strong>マテリアル側でもう一度読み込む</strong>。Shading
+          ワークスペースで<strong>画像テクスチャ</strong>ノードを足し、その「カラー」をプリンシプルBSDFの「ベースカラー」に繋ぐ。</span
+        >
+        <p>
+          <strong>ベクトル入力には何も繋がなくていい。</strong>空のままなら、オブジェクトのアクティブな
+          UV マップが自動で使われる。つまり UV Editor での作業は無駄になっていない。
+        </p>
+      </div>
+
+      <section>
+        <h2><span class="lead">Why</span>大前提：UV Editor で画像を開いても、マテリアルにはならない</h2>
+        <p>
+          UV Editor に表示している画像は <strong>UV展開の参照用</strong>にすぎない。実際にレンダリングされるのは<strong>マテリアルのノード</strong>のほうで、<strong>この2つは別物。自動では繋がらない。</strong>
+        </p>
+        <figure>
+          <svg
+            viewBox="0 0 600 150"
+            role="img"
+            aria-label="UV Editor の画像とマテリアルの画像テクスチャが別物であることを示す図。左の箱は「UV Editor の画像（UV合わせの見本）」、右の箱は「マテリアルの画像テクスチャ（実際に描画されるもの）」。両者を結ぶ線には ✕ が付いていて、自動では連動しないことを示している"
+          >
+            <g
+              fill="currentColor"
+              font-family="ui-sans-serif, system-ui, sans-serif"
+              font-size="12"
+            >
+              <rect
+                x="8"
+                y="24"
+                width="220"
+                height="62"
+                rx="8"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                opacity="0.8"
+              />
+              <text x="118" y="50" text-anchor="middle" font-weight="700">UV Editor の画像</text>
+              <text x="118" y="70" text-anchor="middle" font-size="11" opacity="0.8">
+                UV合わせの見本
+              </text>
+
+              <path
+                d="M236 55 H364"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-dasharray="5 5"
+                opacity="0.45"
+              />
+              <text x="300" y="40" text-anchor="middle" font-size="15" font-weight="700">✕</text>
+              <text x="300" y="80" text-anchor="middle" font-size="11" opacity="0.8">
+                自動では連動しない
+              </text>
+
+              <rect
+                x="372"
+                y="24"
+                width="220"
+                height="62"
+                rx="8"
+                fill="currentColor"
+                fill-opacity="0.07"
+                stroke="currentColor"
+                stroke-width="1.5"
+                opacity="0.8"
+              />
+              <text x="482" y="50" text-anchor="middle" font-weight="700">
+                マテリアルの画像テクスチャ
+              </text>
+              <text x="482" y="70" text-anchor="middle" font-size="11" opacity="0.8">
+                実際に描画されるもの
+              </text>
+
+              <text x="8" y="124" font-size="11" opacity="0.75">
+                → 同じ画像を、マテリアル側でもう一度読み込む必要がある
+              </text>
+            </g>
+          </svg>
+          <figcaption>
+            UV Editor ＝「どこに貼るか」を決める場所。Shading（マテリアル）＝「何を貼るか」を決める場所。
+          </figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2><span class="lead">Steps</span>手順</h2>
+        <ol class="steps">
+          <li>オブジェクトを選択</li>
+          <li>
+            <strong>マテリアルプロパティ &gt; 新規</strong>
+            <p>赤い球のアイコン。</p>
+          </li>
+          <li>上部タブの <strong>Shading</strong> ワークスペースへ</li>
+          <li><code>Shift+A &gt; テクスチャ &gt; 画像テクスチャ</code></li>
+          <li>
+            ノードの<strong>「開く」</strong>ボタンで、<strong>UV Editor で使ったのと同じ画像</strong>を読み込む
+          </li>
+          <li>
+            画像テクスチャの<strong>「カラー」</strong>→ プリンシプルBSDFの<strong>「ベースカラー」</strong>へ接続
+          </li>
+          <li>
+            <code>Z &gt; マテリアルプレビュー</code> で確認
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="lead">Vector</span>なぜ UV が自動で効くのか</h2>
+        <p>画像テクスチャノードの<strong>ベクトル</strong>入力について、公式マニュアルはこう書いている。</p>
+        <blockquote class="manual">
+          <p>
+            「<strong>何も接続されていない場合、座標はオブジェクトのアクティブなUVマップから取られる（Z = 0）</strong>」
+          </p>
+        </blockquote>
+        <p>
+          だから<strong>ベクトル入力には何も繋がなくていい。</strong>UV Editor
+          で調整した UV が、そのまま使われる。
+        </p>
+
+        <h3>複数の UV マップがある場合だけ指定が必要</h3>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">方法</th>
+                <th scope="col">手順</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">アクティブを切り替える</th>
+                <td>
+                  オブジェクトデータプロパティ &gt; <strong>UVマップ</strong> で使いたいものを選択
+                  <span class="ui">緑の三角のアイコン</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">ノードで明示する</th>
+                <td>
+                  <code>Shift+A &gt; 入力 &gt; UVマップ</code> を追加 → <strong>ベクトル</strong>に接続
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Debug</span>反映されないときのチェック</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">症状</th>
+                <th scope="col">原因・対処</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">何も変わらない</th>
+                <td>
+                  ビューポートがソリッド表示。<strong><code>Z</code> &gt; マテリアルプレビュー</strong>（またはレンダー）へ
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">ソリッドのまま見たい</th>
+                <td>
+                  ビューポートシェーディング &gt; <strong>カラー &gt; テクスチャ</strong>
+                  <span class="ui">右上の ▼ から</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">真っ黒／真っ白</th>
+                <td>
+                  「カラー」→「ベースカラー」に<strong>繋がっていない</strong>。ノードの線を確認
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">ずれる・伸びる</th>
+                <td>UV が合っていない。UV Editor で展開を確認</td>
+              </tr>
+              <tr>
+                <th scope="row">一部の面だけ出ない</th>
+                <td>
+                  <strong>マテリアルスロットの割り当て漏れ</strong>。編集モードで面を選択 &gt; マテリアルプロパティ &gt; <strong>割り当て</strong>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">色がおかしい</th>
+                <td>
+                  <strong>カラースペース</strong>。色なら <code>sRGB</code>、ラフネス／法線／ディスプレイスメントは <code>Non-Color</code>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">画像が繰り返される</th>
+                <td>
+                  <strong>拡張（Extension）</strong>の設定。UV がはみ出していて繰り返したくないなら<strong>クリップ</strong>か<strong>延長</strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Node</span>画像テクスチャノードの設定</h2>
+
+        <h3>拡張（Extension）</h3>
+        <p>ベクトルが画像の範囲外に出たときの挙動を制御する。</p>
+        <dl class="defs">
+          <dt>リピート</dt>
+          <dd>タイリング</dd>
+          <dt>延長</dt>
+          <dd>端のピクセルを繰り返す</dd>
+          <dt>クリップ</dt>
+          <dd>画像の外は透明</dd>
+          <dt>ミラー</dt>
+          <dd>交互に反転</dd>
+        </dl>
+
+        <h3>投影（Projection）</h3>
+        <dl class="defs">
+          <dt>フラット</dt>
+          <dd>画像を単位正方形に置き、垂直に投影する。通常は UV マップと併用</dd>
+          <dt>ボックス</dt>
+          <dd>立方体の各面に投影（ブレンド設定あり）</dd>
+          <dt>スフィア</dt>
+          <dd>球に巻き付ける</dd>
+          <dt>チューブ</dt>
+          <dd>円筒に巻き付ける。ボトルのラベルなどに向く</dd>
+        </dl>
+        <div class="note">
+          <p><strong>UV 展開したなら「フラット」のままでよい。</strong></p>
+        </div>
+
+        <h3>補間（Interpolation）</h3>
+        <dl class="defs">
+          <dt>リニア</dt>
+          <dd>通常品質</dd>
+          <dt>キュービック</dt>
+          <dd>より滑らか。バンプマップに推奨</dd>
+          <dt>クローゼスト</dt>
+          <dd>最近傍。ピクセルアートに向く</dd>
+          <dt>スマート</dt>
+          <dd>Cycles のみ、OSL 用</dd>
+        </dl>
+        <div class="note">
+          <p>
+            <strong>ドット絵・ピクセルアートなら必ず「クローゼスト」。</strong>そうしないとボケる。
+          </p>
+        </div>
+
+        <h3>アルファ（透過画像の場合）</h3>
+        <ul class="ticks">
+          <li>
+            画像テクスチャの<strong>「アルファ」出力</strong> → プリンシプルBSDFの<strong>「アルファ」</strong>に接続
+          </li>
+          <li>
+            マテリアルプロパティ &gt; <strong>設定 &gt; ブレンドモード</strong> を調整
+            <p>EEVEE の場合。</p>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="lead">Faster</span>時短テクニック</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">方法</th>
+                <th scope="col">内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">ドラッグ＆ドロップ</th>
+                <td>
+                  Shading ワークスペースで、画像ファイルをノードエディタに放り込むと画像テクスチャノードが作られる
+                  <span class="ui">バージョンによって挙動が不安定なことがある</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Node Wrangler</th>
+                <td>
+                  アドオンを有効化 → プリンシプルBSDFを選択して <code>Ctrl+Shift+T</code> → カラー／ラフネス／法線などの<strong>PBRテクスチャ一式を自動で読み込んで接続</strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="lead">Recap</span>覚え方</h2>
+        <ul class="marks">
+          <li class="bad">
+            <strong>UV Editor で画像を開いただけでは表示されない。</strong>
+            <p>そこは「どこに貼るか」を決める場所。</p>
+          </li>
+          <li class="good">
+            <strong>Shading（マテリアル）で、同じ画像をもう一度読み込む。</strong>
+            <p>こちらが「何を貼るか」を決める場所。</p>
+          </li>
+          <li class="good">
+            <strong>ベクトル入力は空のままでいい。</strong>
+            <p>アクティブな UV マップが自動で使われる。</p>
+          </li>
+        </ul>
+        <p>両方そろって初めて画像が表示される。</p>
+      </section>
+
+      <section>
+        <h2><span class="lead">See also</span>関連</h2>
+        <ul class="ticks">
+          <li><strong>マテリアルのバンプ設定</strong></li>
+          <li><strong>スペキュラーとIOR</strong></li>
+          <li><strong>複数オブジェクトに同じマテリアルを割り当てる</strong></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

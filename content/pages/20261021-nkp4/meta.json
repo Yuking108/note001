@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "20261021-nkp4",
+  "title": "UV Editorで合わせた画像をマテリアルとして反映させる",
+  "summary": "UV Editor に開いた画像は参照用で、マテリアルとは自動で繋がらない。同じ画像を画像テクスチャノードでもう一度読み込み「カラー」→プリンシプルBSDF「ベースカラー」に接続すれば反映され、ベクトル入力は未接続のままでアクティブなUVマップが使われる。",
+  "mainLabel": "Blender/レンダリング",
+  "subLabels": [
+    "Blender/テクニック",
+    "Blender/モデリング",
+    "Blender/アドオン"
+  ],
+  "createdAt": "2026-10-21",
+  "updatedAt": "2026-10-21",
+  "visibility": "private",
+  "links": [],
+  "source": {
+    "kind": "claude-code",
+    "file": "テクニック/TIPS_UVに合わせた画像をマテリアルとして反映させる.md",
+    "note": "docs/テクニック/TIPS_UVに合わせた画像をマテリアルとして反映させる.md を夜間取り込みでページ化したもの"
+  }
+}
